@@ -5,7 +5,9 @@ import datetime
 import sys
 import dhtreader
 import os
+import os.path
 from pywapi import get_weather_from_noaa
+import threading
 
 def outdoor():
         w=get_weather_from_noaa('KCLL')
@@ -74,8 +76,9 @@ class DHT:
         THI=t-0.55*(1-h/100)*(t-58)
         return t, h, int(round(THI))
 
-class temp:
+class temp(threading.Thread):
     def __init__(self):
+        threading.Thread.__init__(self)
         self.relay=relay()
         self.sensor=DHT()
         self.active_hist=1
@@ -84,36 +87,26 @@ class temp:
         self.cool_set=75
         self.heat_set_away=55
         self.cool_set_away=85
+        self.active="manual"
         self.state="home"
         self.mode="off"
-        self.log_int=15
-        self.run=True
-        self.run_int=15
+        self.loop=True
+        self.log_int=1#5
+        self.run_int=1#5
         self.hostname = ["192.168.1.27", "192.168.1.3"]
-        self.temp_file=open('/sys/class/thermal/thermal_zone0/temp','r')
-        log_text='T,RH,THI'
-        log_text+=',active_hist'
-        log_text+=',inactive_hist'
-        log_text+=',heat_set'
-        log_text+=',cool_set'
-        log_text+=',heat_set_away'
-        log_text+=',cool_set_away'
-        log_text+=',state'
-        log_text+=',mode'
-        self.log_file=open('./therm.log','a+')
-        self.log_file.write(log_text)
 
     def run(self):
-        log_time=datetime.datetime.now()
-        while(self.run):
-            self.cpu_temp()
-            self.T, self.RH, self.THI=DHT.read()
-            self.home()
+        while(self.loop):
+            run_time=datetime.datetime.now()
+            self.read_cpu_temp()
+            self.T, self.RH, self.THI=self.sensor.read()
+            if self.active=="auto":
+                    self.home()
             if self.state=="home":
                 hist=self.active_hist
                 cool_set=self.cool_set
                 heat_set=self.heat_set
-            elif self.stat=="away":
+            elif self.state=="away":
                 hist=self.inactive_hist
                 cool_set=self.cool_set_away
                 heat_set=self.heat_set_away
@@ -121,36 +114,76 @@ class temp:
                 sys.exit("self.state broke")
 
             if self.mode=="cool":
-                if THI > cool_set + hist:
+                if self.THI > cool_set + hist:
                     self.relay.cool()
                     run_time=datetime.datetime.now()
-                elif THI < cool_set and datetime.datetime.now()-log_time>=datetime.deltatime(minutes=self.run_int):
+                elif self.THI < cool_set and datetime.datetime.now()-run_time>=datetime.timedelta(minutes=self.run_int):
                     self.relay.fan()#spin down
                     self.wait(30)
                     self.relay.off()
             elif self.mode=="heat":
-                if THI < heat_set - hist:
+                if self.THI < heat_set - hist:
                     self.relay.heat()
                     run_time=datetime.datetime.now()
-                elif THI > heat_set and datetime.datetime.now()-log_time>=datetime.deltatime(minutes=self.run_int):
+                elif self.THI > heat_set and datetime.datetime.now()-run_time>=datetime.timedelta(minutes=self.run_int):
                     self.relay.fan()#spin down
                     self.wait(30)
                     self.relay.off()
-            if datetime.datetime.now()-log_time>=datetime.deltatime(minutes=self.log_int):
-                log_time=datetime.datetime.now()
-                log_text=self.T+','+self.RH+','+self.THI
-                log_text+=','+self.active_hist
-                log_text+=','+self.inactive_hist
-                log_text+=','+self.heat_set
-                log_text+=','+self.cool_set
-                log_text+=','+self.heat_set_away
-                log_text+=','+self.cool_set_away
-                log_text+=','+self.state
-                log_text+=','+self.mode
-                self.log_file.write(log_text)
+            elif self.mode=="off":
+                self.relay.off()
+            elif self.mode=="fan":
+                self.relay.fan()
+            else:
+                print "self.mode broke"
+                self.loop=False
+            self.log()
         del self.relay
         del self.sensor
+        print "Exit"
         sys.exit(0)
+
+    def stop(self):
+        self.loop=False
+
+    def log(self):
+        self.log_time=datetime.datetime.now()
+        if not os.path.isfile('./therm.log'): 
+            log_text='T,RH,THI'
+            log_text+=',active_hist'
+            log_text+=',inactive_hist'
+            log_text+=',heat_set'
+            log_text+=',cool_set'
+            log_text+=',heat_set_away'
+            log_text+=',cool_set_away'
+            log_text+=',state'
+            log_text+=',mode'
+            log_text+='\n'
+            log_text+=str(self.T)+','+str(self.RH)+','+str(self.THI)
+            log_text+=','+str(self.active_hist)
+            log_text+=','+str(self.inactive_hist)
+            log_text+=','+str(self.heat_set)
+            log_text+=','+str(self.cool_set)
+            log_text+=','+str(self.heat_set_away)
+            log_text+=','+str(self.cool_set_away)
+            log_text+=','+str(self.state)
+            log_text+=','+str(self.mode)
+            log_text+='\n'
+            self.log_file=open('./therm.log','w')
+            self.log_file.write(log_text)
+ 
+        elif (datetime.datetime.now()-self.log_time>=datetime.timedelta(minutes=self.log_int)):
+            log_text=str(self.T)+','+str(self.RH)+','+str(self.THI)
+            log_text+=','+str(self.active_hist)
+            log_text+=','+str(self.inactive_hist)
+            log_text+=','+str(self.heat_set)
+            log_text+=','+str(self.cool_set)
+            log_text+=','+str(self.heat_set_away)
+            log_text+=','+str(self.cool_set_away)
+            log_text+=','+str(self.state)
+            log_text+=','+str(self.mode)
+            log_text+='\n'
+            self.log_time=datetime.datetime.now()
+            self.log_file.write(log_text)
 
     def home(self):
         self.state="away"
@@ -163,35 +196,14 @@ class temp:
     def wait(self, time):
         for i in range(time):
             sleep(1)
-            if not self.run:
+            if not self.loop:
                 del self.relay
                 del self.sensor
                 sys.exit(0)
 
-    def cpu_temp(self):
-        self.cpu_temp=int(self.temp_file.read())*9/5000+32
+    def read_cpu_temp(self):
+        temp_file=open('/sys/class/thermal/thermal_zone0/temp','r')
+        self.cpu_temp=int(temp_file.read())*9/5000+32
+        temp_file.close()
         if self.cpu_temp>130:
             print "I'm burning up"
-    
-    
-    #!/usr/bin/python2
-    #from scapy.all import Ether, arping
-    #
-    #ans, unans=arping("192.168.1.*")
-    #ans2, unans=arping("192.168.0.*")
-    #del unans
-    #mac=[]
-    #for p in ans:
-    #    mac.append(p[1][Ether].src)
-    #
-    #for p in ans2:
-    #    mac.append(p[1][Ether].src)
-    #
-    #phones=['00:90:4c:b4:37:6a',' b0:34:95:8f:c2:66']
-    #state="away"
-    #for p in phones:
-    #    if p in mac:
-    #        state="here"
-    #
-    #print state
-    #print mac
