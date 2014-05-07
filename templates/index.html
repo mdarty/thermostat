@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% block head %}
+    <script>
+    function updatetemp() {
+    	$SCRIPT_ROOT = {{ request.script_root|tojson|safe }};
+    	$.ajax({
+        url : $SCRIPT_ROOT + "/updatetemp",
+        success : function(result){
+            $('#indoorTempDiv').html(result);
+        }
+    })
+    };
+    //window.setInterval(function(){
+    //  updatetemp()
+    //}, 5000);
+
+    function updateRH() {
+    	$SCRIPT_ROOT = {{ request.script_root|tojson|safe }};
+    	$.ajax({
+        url : $SCRIPT_ROOT + "/updateRH",
+        success : function(result){
+            $('#indoorRHDiv').html(result);
+        }
+    })
+    };
+   	window.addEventListener('load', function() {
+		var plus, minus;
+
+		plus = document.getElementById('plus');
+		minus = document.getElementById('minus');
+
+		// Android 2.2 needs FastClick to be instantiated before the other listeners so that the stopImmediatePropagation hack can work.
+		FastClick.attach(minus);
+		FastClick.attach(plus);
+
+		plus.addEventListener('click', function(event) {
+			increment(document.getElementById('target'))
+		}, false);
+
+		minus.addEventListener('click', function(event) {
+			decrement(document.getElementById('target'))
+		}, false);
+	}, false);
+
+    window.setInterval(function(){
+      updatetemp()
+      updateRH()
+    }, 5000);
+    </script>
+{% endblock %}
+{% block content %}
+    <p id="currentTemp"><span id="indoorTempDiv"></span>&deg;</p>
+    <p id="currentTemp"><span id="indoorRHDiv"></span>&deg;</p>
+    <form action="/index" method="POST" >
+        <h3>Mode</h3>
+        {% if mode == "cool" %}
+            <input type="radio" name="mode" value="cool" checked>Cool<br>
+            <input type="radio" name="mode" value="heat">Heat<br>
+            <input type="radio" name="mode" value="fan">Fan<br>
+            <input type="radio" name="mode" value="off">Off<br>
+        {% elif mode == "head" %}
+            <input type="radio" name="mode" value="cool">Cool<br>
+            <input type="radio" name="mode" value="heat" checked>Heat<br>
+            <input type="radio" name="mode" value="fan">Fan<br>
+            <input type="radio" name="mode" value="off">Off<br>
+        {% elif mode == "fan" %}
+            <input type="radio" name="mode" value="cool">Cool<br>
+            <input type="radio" name="mode" value="heat">Heat<br>
+            <input type="radio" name="mode" value="fan" checked>Fan<br>
+            <input type="radio" name="mode" value="off">Off<br>
+        {% else %}
+            <input type="radio" name="mode" value="cool">Cool<br>
+            <input type="radio" name="mode" value="heat">Heat<br>
+            <input type="radio" name="mode" value="fan">Fan<br>
+            <input type="radio" name="mode" value="off" checked>Off<br>
+        {% endif %}
+        <br>
+        <h3>State</h3>
+        {% if state == "auto" %}
+            <input type="radio" name="state" value="auto" checked>Auto<br>
+            <input type="radio" name="state" value="here">Here<br>
+            <input type="radio" name="state" value="away">Away<br>
+        {% elif state == "here" %}
+            <input type="radio" name="state" value="auto">Auto<br>
+            <input type="radio" name="state" value="here" checked>Here<br>
+            <input type="radio" name="state" value="away">Away<br>
+        {% else %}
+            <input type="radio" name="state" value="auto">Auto<br>
+            <input type="radio" name="state" value="here">Here<br>
+            <input type="radio" name="state" value="away" checked>Away<br>
+        {% endif %}
+        <h3>Away Setting</h3>
+        {% if set_away == "auto" %}
+            <input type="radio" name="state" value="auto" checked>Auto<br>
+            <input type="radio" name="state" value="off">Off<br>
+        {% else %}
+            <input type="radio" name="set_away" value="auto">Auto<br>
+            <input type="radio" name="set_away" value="off" checked>Off<br>
+        {% endif %}
+
+        <br>
+        <input type="text" name="set_temp" size=30 value="{{set_temp}}"/>
+        <button type="submit" name="submit">Go</button>
+    </form>
+
+{% endblock %}

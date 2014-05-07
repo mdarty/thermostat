@@ -87,6 +87,7 @@ class temp(threading.Thread):
         self.cool_set=75
         self.heat_set_away=55
         self.cool_set_away=85
+        self.set_away="off"#auto
         self.active="manual"
         self.state="home"
         self.mode="off"
