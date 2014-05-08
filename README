@@ -1,0 +1,38 @@
+Requirements:
+    RPi.GPIO
+    dhtreader
+    pywapi
+    flask
+
+pywapi:
+    wget https://launchpad.net/python-weather-api/trunk/0.3.8/+download/pywapi-0.3.8.tar.gz
+    tar -vxf pywapi-0.3.8.tar.gz
+    cd pywapi-0.3.8/
+    python2 setup.py build
+    python2 setup.py install
+
+pip install RPi.GPIO
+pacman -S python2-flask python-flask
+
+dhtreader:
+    git clone git://github.com/adafruit/Adafruit-Raspberry-Pi-Python-Code.git
+    cd Adafruit-Raspberry-Pi-Python-Code/Adafruit_DHT_Driver_Python/
+    wget http://www.open.com.au/mikem/bcm2835/bcm2835-1.8.tar.gz
+    tar -xf bcm2835-1.8.tar.gz
+    cd bcm2835-1.8/
+    ./configure
+    make
+    make install
+    cd ..
+    python2 ./setup.py build
+    mv build/lib.linux-armv6l-2.7/dhtreader.so ./
+
+Manual Use:
+    Warning things can break very easily this is for development only
+    # python2
+    >> from thermo import temp
+    >> t=temp()
+    >> t.start()
+    >> t.mode="cool"
+
+Once I feel more comfortable with the code I will publish it under an open source license. (MIT, GPLv2, GPLv3, Apache, or BSD)

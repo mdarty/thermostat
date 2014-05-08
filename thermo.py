@@ -10,10 +10,13 @@ from pywapi import get_weather_from_noaa
 import threading
 
 def outdoor():
+    try:
         w=get_weather_from_noaa('KCLL')
         t=round(float(w[u'temp_f']),1)
         h=round(float(w[u'relative_humidity']),1)
         return t, h
+    except:
+        return 0, 0
 
 class relay:
     def __init__(self):
@@ -58,86 +61,100 @@ class relay:
         self.off()
         GPIO.cleanup()
 
-class DHT:
+class DHT(threading.Thread):
     def __init__(self):
+        threading.Thread.__init__(self)
         dhtreader.init()
         self.dev_type = int(22)
         self.dhtpin = int(4)
+        self.loop=True
+        self.t=0
+        self.h=0
+        self.THI=0
 
     def read(self):
-        while(True):
-            try:
-                t, h = dhtreader.read(self.dev_type, self.dhtpin)
-                break
-            except TypeError:
-                continue
-        t=round(t*9/5+32,1)
-        h=round(h,1)
-        THI=t-0.55*(1-h/100)*(t-58)
-        return t, h, int(round(THI))
+        return self.t, self.h, self.THI
+
+    def run(self):
+        while(self.loop):
+            while(self.loop):
+                try:
+                    t, h = dhtreader.read(self.dev_type, self.dhtpin)
+                    break
+                except TypeError:
+                    sleep(3)
+            self.t=round(t*9/5+32,1)
+            self.h=round(h,1)
+            self.THI=round(t-0.55*(1-h/100)*(t-58),1)
+            sleep(60)
+
+    def __del__(self):
+        self.loop=False
 
 class temp(threading.Thread):
     def __init__(self):
         threading.Thread.__init__(self)
         self.relay=relay()
         self.sensor=DHT()
+        self.sensor.start()
+        sleep(1)
         self.active_hist=1
         self.inactive_hist=5
-        self.heat_set=65
-        self.cool_set=75
-        self.heat_set_away=55
-        self.cool_set_away=85
+        self.set_temp=70
+        self.set_away_temp=75
         self.set_away="off"#auto
         self.active="manual"
         self.state="home"
         self.mode="off"
         self.loop=True
-        self.log_int=1#5
-        self.run_int=1#5
+        self.log_int=15
+        self.run_int=15
         self.hostname = ["192.168.1.27", "192.168.1.3"]
+        self.T=0
+        self.RH=0
+        self.THI=0
+        self.RHout=0
+        self.Tout=0
 
     def run(self):
         while(self.loop):
             run_time=datetime.datetime.now()
             self.read_cpu_temp()
             self.T, self.RH, self.THI=self.sensor.read()
+            self.Tout, self.RHout=outdoor()
             if self.active=="auto":
-                    self.home()
+                self.home()
             if self.state=="home":
-                hist=self.active_hist
-                cool_set=self.cool_set
-                heat_set=self.heat_set
+                self.hist=self.active_hist
+                self.desired_temp=self.set_temp
             elif self.state=="away":
-                hist=self.inactive_hist
-                cool_set=self.cool_set_away
-                heat_set=self.heat_set_away
+                self.hist=self.inactive_hist
+                self.desired_temp=self.set_away_temp
             else:
                 sys.exit("self.state broke")
 
             if self.mode=="cool":
-                if self.THI > cool_set + hist:
+                if self.THI > self.desired_temp + self.hist and self.relay.run != "cool":
                     self.relay.cool()
                     run_time=datetime.datetime.now()
-                elif self.THI < cool_set and datetime.datetime.now()-run_time>=datetime.timedelta(minutes=self.run_int):
+                elif self.THI < self.desired_temp and datetime.datetime.now()-run_time>=datetime.timedelta(minutes=self.run_int):
                     self.relay.fan()#spin down
                     self.wait(30)
                     self.relay.off()
             elif self.mode=="heat":
-                if self.THI < heat_set - hist:
+                if self.THI < heat_set - self.hist and self.relay.run != "heat":
                     self.relay.heat()
                     run_time=datetime.datetime.now()
-                elif self.THI > heat_set and datetime.datetime.now()-run_time>=datetime.timedelta(minutes=self.run_int):
+                elif self.THI > heat_set and self.relay.run != "off" and datetime.datetime.now()-run_time>=datetime.timedelta(minutes=self.run_int):
                     self.relay.fan()#spin down
                     self.wait(30)
                     self.relay.off()
-            elif self.mode=="off":
+            elif self.mode=="off" and self.relay.run != "off":
                 self.relay.off()
-            elif self.mode=="fan":
+            elif self.mode=="fan" and self.relay.run != "fan":
                 self.relay.fan()
-            else:
-                print "self.mode broke"
-                self.loop=False
             self.log()
+            sleep(1)
         del self.relay
         del self.sensor
         print "Exit"
@@ -150,22 +167,14 @@ class temp(threading.Thread):
         self.log_time=datetime.datetime.now()
         if not os.path.isfile('./therm.log'): 
             log_text='T,RH,THI'
-            log_text+=',active_hist'
-            log_text+=',inactive_hist'
-            log_text+=',heat_set'
-            log_text+=',cool_set'
-            log_text+=',heat_set_away'
-            log_text+=',cool_set_away'
+            log_text+=',hist'
+            log_text+=',desired_temp'
             log_text+=',state'
             log_text+=',mode'
             log_text+='\n'
             log_text+=str(self.T)+','+str(self.RH)+','+str(self.THI)
-            log_text+=','+str(self.active_hist)
-            log_text+=','+str(self.inactive_hist)
-            log_text+=','+str(self.heat_set)
-            log_text+=','+str(self.cool_set)
-            log_text+=','+str(self.heat_set_away)
-            log_text+=','+str(self.cool_set_away)
+            log_text+=','+str(self.hist)
+            log_text+=','+str(self.desired_temp)
             log_text+=','+str(self.state)
             log_text+=','+str(self.mode)
             log_text+='\n'
@@ -174,12 +183,8 @@ class temp(threading.Thread):
  
         elif (datetime.datetime.now()-self.log_time>=datetime.timedelta(minutes=self.log_int)):
             log_text=str(self.T)+','+str(self.RH)+','+str(self.THI)
-            log_text+=','+str(self.active_hist)
-            log_text+=','+str(self.inactive_hist)
-            log_text+=','+str(self.heat_set)
-            log_text+=','+str(self.cool_set)
-            log_text+=','+str(self.heat_set_away)
-            log_text+=','+str(self.cool_set_away)
+            log_text+=','+str(self.hist)
+            log_text+=','+str(self.desired_temp)
             log_text+=','+str(self.state)
             log_text+=','+str(self.mode)
             log_text+='\n'
