@@ -41,16 +41,28 @@
     })
     };
 
+    function run_AC() {
+    	$SCRIPT_ROOT = {{ request.script_root|tojson|safe }};
+    	$.ajax({
+        url : $SCRIPT_ROOT + "/run_AC",
+        success : function(result){
+            $('#run_AC').html(result);
+        }
+    })
+    };
+
     window.setInterval(function(){
       updatetemp()
       updateRH()
       updateOuttemp()
       updateOutRH()
+      run_AC()
     }, 600000);
     updatetemp()
     updateRH()
     updateOuttemp()
     updateOutRH()
+    run_AC()
     </script>
 {% endblock %}
 {% block content %}
@@ -71,6 +83,7 @@
             <td><span id="outdoorRHDiv"></span>&deg;</p></td>
         </tr>
     </table>
+    <h3>System:</h3><span id="run_AC"></span>
     <form action="/index" method="POST" >
         <h3>Mode</h3>
         {% if mode == "cool" %}

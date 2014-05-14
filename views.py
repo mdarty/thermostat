@@ -20,7 +20,7 @@ class LoginForm(Form):
 @app.route('/')
 @app.route('/index')
 def index():
-    return render_template("index.html", title="Home", mode=temp.mode, set_temp=temp.set_temp, state=temp.state, set_away_temp=temp.set_away_temp, set_away=temp.set_away)
+    return render_template("index.html", title="Thermostat", mode=temp.mode, set_temp=temp.set_temp, state=temp.state, set_away_temp=temp.set_away_temp, set_away=temp.set_away)
 
 @app.route('/index', methods = ['POST'])
 def index_post():
@@ -30,7 +30,7 @@ def index_post():
     temp.state=request.form['state']
     temp.set_away_temp=request.form['set_away_temp']
     temp.set_away=request.form['set_away']
-    return render_template("index.html", title="Home", mode=temp.mode, set_temp=temp.set_temp, state=temp.state, set_away_temp=temp.set_away_temp, set_away=temp.set_away)
+    return render_template("index.html", title="Thermostat", mode=temp.mode, set_temp=temp.set_temp, state=temp.state, set_away_temp=temp.set_away_temp, set_away=temp.set_away)
 
 @app.route('/login', methods = ['GET', 'POST'])
 def login():
@@ -42,6 +42,10 @@ def login():
         title = 'Sign In',
         form = form,
         providers = app.config['OPENID_PROVIDERS'])
+
+@app.route('/run_AC', methods = ['Get'])
+def run_AC():
+    return str(temp.relay.run)
 
 @app.route('/updatetemp', methods = ['Get'])
 def updatetemp():
