@@ -8,6 +8,8 @@ import os
 import os.path
 import pywapi
 import threading
+import pickle
+from lockfile import FileLock
 
 def outdoor():
     try:
@@ -113,13 +115,8 @@ class DHT(threading.Thread):
         self.loop=False
         sleep(2)
 
-class temp(threading.Thread):
+class thermo:
     def __init__(self):
-        threading.Thread.__init__(self)
-        self.relay=relay()
-        self.sensor=DHT()
-        self.sensor.start()
-        sleep(1)
         self.active_hist=1
         self.inactive_hist=5
         self.set_temp=70
@@ -128,58 +125,89 @@ class temp(threading.Thread):
         self.active="manual"
         self.state="home"
         self.mode="off"
+        self.T=0
+        self.RH=0
+        self.THI=0
+        self.RHout=0
+        self.Tout=0
+        self.run="off"
+
+class temp(threading.Thread):
+    def __init__(self):
+        threading.Thread.__init__(self)
+        self.relay=relay()
+        self.sensor=DHT()
+        self.sensor.start()
+        #sleep(1)
+        self.thermo=thermo()
         self.loop=True
         self.log_int=15
         self.log_time=datetime.datetime.now()-datetime.timedelta(minutes=self.log_int)
         self.run_int=1#5
         self.run_time=datetime.datetime.now()-datetime.timedelta(minutes=self.run_int)
         self.hostname = ["192.168.1.27", "192.168.1.3"]
-        self.T=0
-        self.RH=0
-        self.THI=0
-        self.RHout=0
-        self.Tout=0
+
+        self.directory="/tmp/thermo"
+        if not os.path.exists(self.directory):
+            os.makedirs(self.directory)
 
     def run(self):
         while(self.loop):
+            file_view=self.directory+"/view.obj"
+            if os.path.isfile(file_view):
+                with FileLock(file_view):
+                    file=open(file_view, 'rb')
+                    self.views=pickle.load(file)
+                    file.close()
+                self.thermo.mode=self.views.mode
+                self.thermo.set_temp=self.views.set_temp
+                self.thermo.state=self.views.state
+                self.thermo.set_away_temp=self.views.set_away_temp
+                self.thermo.set_away=self.views.set_away
+            self.thermo.run=self.relay.run
+            file_thermo=self.directory+"/thermo.obj"
             self.read_cpu_temp()
-            self.T, self.RH, self.THI=self.sensor.read()
+            self.thermo.T, self.thermo.RH, self.thermo.THI=self.sensor.read()
             if datetime.datetime.now()-self.run_time>=datetime.timedelta(minutes=self.run_int):
-                self.Tout, self.RHout=outdoor()
-            if self.active=="auto":
+                self.thermo.Tout, self.thermo.RHout=outdoor()
+            with FileLock(file_thermo):
+                file=open(file_thermo, 'wb')
+                pickle.dump(self.thermo, file)
+                file.close()
+            if self.thermo.active=="auto":
                 self.home()
-            if self.state=="home":
-                self.hist=self.active_hist
-                self.desired_temp=self.set_temp
-            elif self.state=="away":
-                self.hist=self.inactive_hist
-                self.desired_temp=self.set_away_temp
+            if self.thermo.state=="home":
+                self.hist=self.thermo.active_hist
+                self.desired_temp=self.thermo.set_temp
+            elif self.thermo.state=="away":
+                self.hist=self.thermo.inactive_hist
+                self.desired_temp=self.thermo.set_away_temp
             else:
                 sys.exit("self.state broke")
 
-            if self.mode=="cool":
-                if self.THI > self.desired_temp + self.hist and self.relay.run != "cool":
+            if self.thermo.mode=="cool":
+                if self.thermo.THI > self.desired_temp + self.hist and self.relay.run != "cool":
                     self.relay.cool()
                     self.run_time=datetime.datetime.now()
                     self.log()
-                elif self.THI < self.desired_temp and self.relay.run == "cool" and datetime.datetime.now()-self.run_time>=datetime.timedelta(minutes=self.run_int):
+                elif self.thermo.THI < self.desired_temp and self.relay.run == "cool" and datetime.datetime.now()-self.run_time>=datetime.timedelta(minutes=self.run_int):
                     self.relay.fan()#spin down
                     self.wait(30)
                     self.relay.off()
                     self.log()
-            elif self.mode=="heat":
-                if self.THI < self.desired_temp - self.hist and self.relay.run != "heat":
+            elif self.thermo.mode=="heat":
+                if self.thermo.THI < self.desired_temp - self.hist and self.relay.run != "heat":
                     self.relay.heat()
                     self.run_time=datetime.datetime.now()
                     self.log()
-                elif self.THI > self.desired_temp and self.relay.run == "heat" and datetime.datetime.now()-self.run_time>=datetime.timedelta(minutes=self.run_int):
+                elif self.thermo.THI > self.desired_temp and self.relay.run == "heat" and datetime.datetime.now()-self.run_time>=datetime.timedelta(minutes=self.run_int):
                     self.relay.fan()#spin down
                     self.wait(30)
                     self.relay.off()
                     self.log()
-            elif self.mode=="off" and self.relay.run != "off":
+            elif self.thermo.mode=="off" and self.relay.run != "off":
                 self.relay.off()
-            elif self.mode=="fan" and self.relay.run != "fan":
+            elif self.thermo.mode=="fan" and self.relay.run != "fan":
                 self.relay.fan()
             if (datetime.datetime.now()-self.log_time>=datetime.timedelta(minutes=self.log_int)):
                 self.log()
@@ -208,11 +236,11 @@ class temp(threading.Thread):
             log_text+=',relay'
             log_text+='\n'
             log_text+=str(datetime.datetime.now())+','
-            log_text+=str(self.T)+','+str(self.RH)+','+str(self.THI)
+            log_text+=str(self.thermo.T)+','+str(self.thermo.RH)+','+str(self.thermo.THI)
             log_text+=','+str(self.hist)
             log_text+=','+str(self.desired_temp)
-            log_text+=','+str(self.state)
-            log_text+=','+str(self.mode)
+            log_text+=','+str(self.thermo.state)
+            log_text+=','+str(self.thermo.mode)
             log_text+=','+str(self.relay.run)
             log_text+='\n'
             self.log_time=datetime.datetime.now()
@@ -223,11 +251,11 @@ class temp(threading.Thread):
  
         else:
             log_text=str(datetime.datetime.now())+','
-            log_text+=str(self.T)+','+str(self.RH)+','+str(self.THI)
+            log_text+=str(self.thermo.T)+','+str(self.thermo.RH)+','+str(self.thermo.THI)
             log_text+=','+str(self.hist)
             log_text+=','+str(self.desired_temp)
-            log_text+=','+str(self.state)
-            log_text+=','+str(self.mode)
+            log_text+=','+str(self.thermo.state)
+            log_text+=','+str(self.thermo.mode)
             log_text+=','+str(self.relay.run)
             log_text+='\n'
             self.log_time=datetime.datetime.now()
@@ -257,3 +285,7 @@ class temp(threading.Thread):
         temp_file.close()
         if self.cpu_temp>130:
             print "I'm burning up"
+
+if __name__=="__main__":
+    t=temp()
+    t.start()
