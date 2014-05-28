@@ -91,6 +91,8 @@ class DHT(threading.Thread):
         return self.t, self.h, self.THI
 
     def run(self):
+        t=0
+        h=0
         while(self.loop):
             while(self.loop):
                 try:
@@ -111,9 +113,11 @@ class DHT(threading.Thread):
             if self.loop == False:
                 break
 
+    def stop(self):
+        self.loop=False
+
     def __del__(self):
         self.loop=False
-        sleep(2)
 
 class thermo:
     def __init__(self):
@@ -159,11 +163,12 @@ class temp(threading.Thread):
                     file=open(file_view, 'rb')
                     self.views=pickle.load(file)
                     file.close()
-                self.thermo.mode=self.views.mode
-                self.thermo.set_temp=self.views.set_temp
-                self.thermo.state=self.views.state
-                self.thermo.set_away_temp=self.views.set_away_temp
-                self.thermo.set_away=self.views.set_away
+                    self.thermo.mode=self.views.mode
+                    self.thermo.set_temp=self.views.set_temp
+                    self.thermo.state=self.views.state
+                    self.thermo.set_away_temp=self.views.set_away_temp
+                    self.thermo.set_away=self.views.set_away
+                    #print "Read view.obj"
             self.thermo.run=self.relay.run
             file_thermo=self.directory+"/thermo.obj"
             self.read_cpu_temp()
@@ -174,9 +179,15 @@ class temp(threading.Thread):
                 file=open(file_thermo, 'wb')
                 pickle.dump(self.thermo, file)
                 file.close()
+                #print "Wrote thermo.obj"
             if self.thermo.active=="auto":
+                #print "Finding home"
                 self.home()
-            if self.thermo.state=="home":
+
+            #print "Setting desired_temp and hist"
+            #print self.thermo.state
+            #if self.thermo.state=="home":
+            if self.thermo.state=="here":
                 self.hist=self.thermo.active_hist
                 self.desired_temp=self.thermo.set_temp
             elif self.thermo.state=="away":
@@ -185,6 +196,7 @@ class temp(threading.Thread):
             else:
                 sys.exit("self.state broke")
 
+            #print "Reached Logic"
             if self.thermo.mode=="cool":
                 if self.thermo.THI > self.desired_temp + self.hist and self.relay.run != "cool":
                     self.relay.cool()
@@ -209,14 +221,15 @@ class temp(threading.Thread):
                 self.relay.off()
             elif self.thermo.mode=="fan" and self.relay.run != "fan":
                 self.relay.fan()
+            #print "Here Log"
             if (datetime.datetime.now()-self.log_time>=datetime.timedelta(minutes=self.log_int)):
                 self.log()
             sleep(1)
         del self.relay
-        del self.sensor
+        self.sensor.stop()
+        self.sensor.join()
         sleep(1)
-        print "Exit"
-        #sys.exit(0)
+        #print "Exit"
 
     def stop(self):
         self.loop=False
@@ -289,3 +302,14 @@ class temp(threading.Thread):
 if __name__=="__main__":
     t=temp()
     t.start()
+    while True:
+        try:
+            t.join(600)
+        except KeyboardInterrupt:
+            print "Interrupt Please wait for program to exit cleanly"
+            t.stop()
+            t.join()
+            break
+        if not t.isAlive():
+            print "The thread is Dead"
+    sys.exit(0)
