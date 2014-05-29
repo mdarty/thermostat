@@ -224,12 +224,11 @@ class temp(threading.Thread):
             #print "Here Log"
             if (datetime.datetime.now()-self.log_time>=datetime.timedelta(minutes=self.log_int)):
                 self.log()
-            sleep(1)
+            if self.loop:
+                sleep(.5)
         del self.relay
         self.sensor.stop()
         self.sensor.join()
-        sleep(1)
-        #print "Exit"
 
     def stop(self):
         self.loop=False
