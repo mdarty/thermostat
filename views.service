@@ -1,0 +1,12 @@
+[Unit]
+Description=Thermostat UI
+After=network.target
+
+[Service]
+Type=forking
+PIDFile=/tmp/thermo/views.pid
+ExecStart=/root/thermostat/views-daemon.py start
+ExecStop=/root/thermostat/views-daemon.py stop
+
+[Install]
+WantedBy=multi-user.target

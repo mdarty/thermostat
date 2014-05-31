@@ -1,0 +1,12 @@
+[Unit]
+Description=Thermostat
+After=network.target
+
+[Service]
+Type=forking
+PIDFile=/tmp/thermo/thermo.pid
+ExecStart=/root/thermostat/thermo-daemon.py start
+ExecStop=/root/thermostat/thermo-daemon.py stop
+
+[Install]
+WantedBy=multi-user.target

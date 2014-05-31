@@ -1,15 +1,16 @@
 #!/usr/bin/python2
 import RPi.GPIO as GPIO
 from time import sleep
-import datetime
-import sys
-import dhtreader
-import os
-import os.path
-import pywapi
-import threading
-import pickle
 from lockfile import FileLock
+import datetime, sys, os, signal, pickle, threading, pywapi, os.path, pywapi, dhtreader
+
+Stop=False
+def sig_handler(signum, frame):
+    global Stop
+    Stop=True
+
+signal.signal(signal.SIGTERM, sig_handler)
+signal.signal(signal.SIGINT, sig_handler)
 
 def outdoor():
     try:
@@ -125,7 +126,7 @@ class thermo:
         self.inactive_hist=5
         self.set_temp=70
         self.set_away_temp=75
-        self.set_away="off"#auto
+        self.set_away="off"
         self.active="manual"
         self.state="home"
         self.mode="off"
@@ -142,12 +143,11 @@ class temp(threading.Thread):
         self.relay=relay()
         self.sensor=DHT()
         self.sensor.start()
-        #sleep(1)
         self.thermo=thermo()
         self.loop=True
         self.log_int=15
         self.log_time=datetime.datetime.now()-datetime.timedelta(minutes=self.log_int)
-        self.run_int=1#5
+        self.run_int=15
         self.run_time=datetime.datetime.now()-datetime.timedelta(minutes=self.run_int)
         self.hostname = ["192.168.1.27", "192.168.1.3"]
 
@@ -168,7 +168,6 @@ class temp(threading.Thread):
                     self.thermo.state=self.views.state
                     self.thermo.set_away_temp=self.views.set_away_temp
                     self.thermo.set_away=self.views.set_away
-                    #print "Read view.obj"
             self.thermo.run=self.relay.run
             file_thermo=self.directory+"/thermo.obj"
             self.read_cpu_temp()
@@ -179,24 +178,18 @@ class temp(threading.Thread):
                 file=open(file_thermo, 'wb')
                 pickle.dump(self.thermo, file)
                 file.close()
-                #print "Wrote thermo.obj"
             if self.thermo.active=="auto":
-                #print "Finding home"
                 self.home()
 
-            #print "Setting desired_temp and hist"
-            #print self.thermo.state
-            #if self.thermo.state=="home":
-            if self.thermo.state=="here":
+            if self.thermo.state=="here" or self.thermo.state=="home":
                 self.hist=self.thermo.active_hist
                 self.desired_temp=self.thermo.set_temp
             elif self.thermo.state=="away":
                 self.hist=self.thermo.inactive_hist
                 self.desired_temp=self.thermo.set_away_temp
             else:
-                sys.exit("self.state broke")
+                print "State broke"
 
-            #print "Reached Logic"
             if self.thermo.mode=="cool":
                 if self.thermo.THI > self.desired_temp + self.hist and self.relay.run != "cool":
                     self.relay.cool()
@@ -221,7 +214,6 @@ class temp(threading.Thread):
                 self.relay.off()
             elif self.thermo.mode=="fan" and self.relay.run != "fan":
                 self.relay.fan()
-            #print "Here Log"
             if (datetime.datetime.now()-self.log_time>=datetime.timedelta(minutes=self.log_int)):
                 self.log()
             if self.loop:
@@ -289,7 +281,6 @@ class temp(threading.Thread):
             if not self.loop:
                 del self.relay
                 del self.sensor
-                sys.exit(0)
 
     def read_cpu_temp(self):
         temp_file=open('/sys/class/thermal/thermal_zone0/temp','r')
@@ -298,13 +289,13 @@ class temp(threading.Thread):
         if self.cpu_temp>130:
             print "I'm burning up"
 
-if __name__=="__main__":
+def main():
+    print "PID: "+str(os.getpid())
     t=temp()
     t.start()
     while True:
-        try:
-            t.join(600)
-        except KeyboardInterrupt:
+        sleep(1)
+        if Stop:
             print "Interrupt Please wait for program to exit cleanly"
             t.stop()
             t.join()
@@ -312,3 +303,6 @@ if __name__=="__main__":
         if not t.isAlive():
             print "The thread is Dead"
     sys.exit(0)
+
+if __name__=="__main__":
+    main()

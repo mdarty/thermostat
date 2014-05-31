@@ -5,9 +5,7 @@ from wtforms import TextField, BooleanField
 from wtforms.validators import Required
 from flask_wtf.csrf import CsrfProtect
 from thermo import temp, thermo
-import sys
-import os
-import pickle
+import sys, os, pickle
 from lockfile import FileLock
 
 app=Flask(__name__)
@@ -161,4 +159,5 @@ def restart():
     return 'restart'
 
 if __name__=="__main__":
-    app.run("0.0.0.0", port=80, debug=True)
+    #app.run("0.0.0.0", port=80, debug=True)
+    app.run("0.0.0.0", port=80)
