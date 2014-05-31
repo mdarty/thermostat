@@ -51,18 +51,31 @@
     })
     };
 
+    function cpu_temp() {
+    	$SCRIPT_ROOT = {{ request.script_root|tojson|safe }};
+    	$.ajax({
+        url : $SCRIPT_ROOT + "/cputemp",
+        success : function(result){
+            $('#cpu_temp').html(result);
+        }
+    })
+    };
+
+
     window.setInterval(function(){
       updatetemp()
       updateRH()
       updateOuttemp()
       updateOutRH()
       run_AC()
+      cpu_temp()
     }, 100000);
     updatetemp()
     updateRH()
     updateOuttemp()
     updateOutRH()
     run_AC()
+    cpu_temp()
     </script>
 {% endblock %}
 {% block content %}
@@ -74,16 +87,17 @@
         </tr>
         <tr>
             <td>Indoor</td>
-            <td><span id="indoorTempDiv"></span>&deg;</p></td>
-            <td><span id="indoorRHDiv"></span>&deg;</p></td>
+            <td><span id="indoorTempDiv"></span>&deg;F</p></td>
+            <td><span id="indoorRHDiv"></span>%</p></td>
         </tr>
         <tr>
             <td>Outdoor</td>
-            <td><span id="outdoorTempDiv"></span>&deg;</p></td>
-            <td><span id="outdoorRHDiv"></span>&deg;</p></td>
+            <td><span id="outdoorTempDiv"></span>&deg;F</p></td>
+            <td><span id="outdoorRHDiv"></span>%</p></td>
         </tr>
     </table>
-    <h3>System:</h3><span id="run_AC"></span>
+    <p><h3>System:</h3><span id="run_AC"></span></p>
+    <p><h3>CPU Temp:</h3><span id="cpu_temp"></span>&deg;F</p>
     <form action="/index" method="POST" >
         <h3>Mode</h3>
         {% if mode == "cool" %}

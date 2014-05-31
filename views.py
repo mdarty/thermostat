@@ -5,8 +5,12 @@ from wtforms import TextField, BooleanField
 from wtforms.validators import Required
 from flask_wtf.csrf import CsrfProtect
 from thermo import temp, thermo
-import sys, os, pickle
+import sys, os, pickle, ConfigParser
 from lockfile import FileLock
+
+Config = ConfigParser.ConfigParser()
+Config.read('config.ini')
+directory=Config.get('thermo', 'directory')
 
 app=Flask(__name__)
 #CsrfProtect(app)
@@ -19,7 +23,8 @@ class LoginForm(Form):
 @app.route('/')
 @app.route('/index')
 def index():
-    directory="/tmp/thermo"
+    global directory
+    #directory="/tmp/thermo"
     if not os.path.exists(directory):
         os.makedirs(directory)
     file_thermo=directory+"/thermo.obj"
@@ -42,7 +47,8 @@ def index():
 @app.route('/index', methods = ['POST'])
 def index_post():
     print request.form
-    directory="/tmp/thermo"
+    global directory
+    #directory="/tmp/thermo"
     file_view=directory+"/view.obj"
     file_thermo=directory+"/thermo.obj"
     if not os.path.exists(directory):
@@ -93,7 +99,8 @@ def login():
 
 @app.route('/run_AC', methods = ['Get'])
 def run_AC():
-    directory="/tmp/thermo"
+    #directory="/tmp/thermo"
+    global directory
     file_thermo=directory+"/thermo.obj"
     if os.path.isfile(file_thermo):
         with FileLock(file_thermo):
@@ -104,7 +111,8 @@ def run_AC():
 
 @app.route('/updatetemp', methods = ['Get'])
 def updatetemp():
-    directory="/tmp/thermo"
+    #directory="/tmp/thermo"
+    global directory
     file_thermo=directory+"/thermo.obj"
     if os.path.isfile(file_thermo):
         with FileLock(file_thermo):
@@ -115,7 +123,8 @@ def updatetemp():
 
 @app.route('/updateRH', methods = ['Get'])
 def updateRH():
-    directory="/tmp/thermo"
+    #directory="/tmp/thermo"
+    global directory
     file_thermo=directory+"/thermo.obj"
     if os.path.isfile(file_thermo):
         with FileLock(file_thermo):
@@ -126,7 +135,8 @@ def updateRH():
 
 @app.route('/updateOuttemp', methods = ['Get'])
 def updateOuttemp():
-    directory="/tmp/thermo"
+    #directory="/tmp/thermo"
+    global directory
     file_thermo=directory+"/thermo.obj"
     if os.path.isfile(file_thermo):
         with FileLock(file_thermo):
@@ -137,7 +147,8 @@ def updateOuttemp():
 
 @app.route('/updateOutRH', methods = ['Get'])
 def updateOutRH():
-    directory="/tmp/thermo"
+    #directory="/tmp/thermo"
+    global directory
     file_thermo=directory+"/thermo.obj"
     if os.path.isfile(file_thermo):
         with FileLock(file_thermo):
@@ -145,6 +156,18 @@ def updateOutRH():
             thermo=pickle.load(file)
             file.close()
     return str(thermo.RHout)
+
+@app.route('/cputemp', methods = ['Get'])
+def cputemp():
+    #directory="/tmp/thermo"
+    global directory
+    file_thermo=directory+"/thermo.obj"
+    if os.path.isfile(file_thermo):
+        with FileLock(file_thermo):
+            file=open(file_thermo, 'rb')
+            thermo=pickle.load(file)
+            file.close()
+    return str(thermo.cpu_temp)
 
 @app.route('/stop', methods = ['Get'])
 def stop():

@@ -2,7 +2,18 @@
 import RPi.GPIO as GPIO
 from time import sleep
 from lockfile import FileLock
-import datetime, sys, os, signal, pickle, threading, pywapi, os.path, pywapi, dhtreader
+import datetime, sys, os, signal, pickle, threading, pywapi, os.path, pywapi, dhtreader, ConfigParser
+
+Config = ConfigParser.ConfigParser()
+Config.read('config.ini')
+ZIP=Config.get('thermo', 'ZIP')
+NOAA=Config.get('thermo','NOAA')
+directory=Config.get('thermo', 'directory')
+log=Config.get('thermo', 'log')
+Cool_Pin=int(Config.get('thermo', 'Cool_Pin'))
+Heat_Pin=int(Config.get('thermo', 'Heat_Pin'))
+Fan_Pin=int(Config.get('thermo', 'Fan_Pin'))
+
 
 Stop=False
 def sig_handler(signum, frame):
@@ -13,20 +24,22 @@ signal.signal(signal.SIGTERM, sig_handler)
 signal.signal(signal.SIGINT, sig_handler)
 
 def outdoor():
+    global NOAA
+    global ZIP
     try:
-        w=pywapi.get_weather_from_noaa('KCLL')
+        w=pywapi.get_weather_from_noaa(NOAA)
         t=round(float(w[u'temp_f']),1)
         h=round(float(w[u'relative_humidity']),1)
         return t, h
     except:
         try:
-            w=pyapi.get_weather_from_weather_com('')
+            w=pywapi.get_weather_from_weather_com(ZIP)
             t=round(float(w[u'current_conditions'][u'temperature']),1)
             h=round(float(w[u'current_conditions'][u'humidity']),1)
             return t, h
         except:
             try:
-                w=pyapi.get_weather_from_yahoo('')
+                w=pywapi.get_weather_from_yahoo(ZIP)
                 t=round(float(w[u'condition'][u'temp']),1)
                 h=round(float(w[u'atmosphere'][u'humidity']),1)
                 return t, h
@@ -35,13 +48,19 @@ def outdoor():
 
 class relay:
     def __init__(self):
+        global Cool_Pin
+        global Heat_Pin
+        global Fan_Pin
         GPIO.setmode(GPIO.BCM)
 
         self.mode="cool"
 
-        self.Cool_Pin=17
-        self.Heat_Pin=18
-        self.Fan_Pin=27
+        self.Cool_Pin=Cool_Pin
+        self.Heat_Pin=Heat_Pin
+        self.Fan_Pin=Fan_Pin
+        #self.Cool_Pin=17
+        #self.Heat_Pin=18
+        #self.Fan_Pin=27
 
         GPIO.setup(self.Cool_Pin, GPIO.OUT)
         GPIO.setup(self.Heat_Pin, GPIO.OUT)
@@ -136,6 +155,7 @@ class thermo:
         self.RHout=0
         self.Tout=0
         self.run="off"
+        self.cpu_temp=0
 
 class temp(threading.Thread):
     def __init__(self):
@@ -150,8 +170,10 @@ class temp(threading.Thread):
         self.run_int=15
         self.run_time=datetime.datetime.now()-datetime.timedelta(minutes=self.run_int)
         self.hostname = ["192.168.1.27", "192.168.1.3"]
-
-        self.directory="/tmp/thermo"
+        
+        global directory
+        #self.directory="/tmp/thermo"
+        self.directory=directory
         if not os.path.exists(self.directory):
             os.makedirs(self.directory)
 
@@ -171,6 +193,7 @@ class temp(threading.Thread):
             self.thermo.run=self.relay.run
             file_thermo=self.directory+"/thermo.obj"
             self.read_cpu_temp()
+            self.thermo.cpu_temp=self.cpu_temp
             self.thermo.T, self.thermo.RH, self.thermo.THI=self.sensor.read()
             if datetime.datetime.now()-self.run_time>=datetime.timedelta(minutes=self.run_int):
                 self.thermo.Tout, self.thermo.RHout=outdoor()
