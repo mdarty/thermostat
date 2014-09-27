@@ -25,11 +25,16 @@ def index():
 @app.route('/index', methods = ['POST'])
 def index_post():
     print request.form
-    temp.mode=request.form['mode']
-    temp.set_temp=request.form['set_temp']
-    temp.state=request.form['state']
-    temp.set_away_temp=request.form['set_away_temp']
-    temp.set_away=request.form['set_away']
+    if request.method['submit'] == 'temp':
+        temp.mode=request.form['mode']
+        temp.set_temp=request.form['set_temp']
+        temp.state=request.form['state']
+        temp.set_away_temp=request.form['set_away_temp']
+        temp.set_away=request.form['set_away']
+    elif request.method['sumbit'] == 'Garage':
+        temp.garage()
+    else:
+        print 'Something Broke on post'
     return render_template("index.html", title="Thermostat", mode=temp.mode, set_temp=temp.set_temp, state=temp.state, set_away_temp=temp.set_away_temp, set_away=temp.set_away)
 
 @app.route('/login', methods = ['GET', 'POST'])

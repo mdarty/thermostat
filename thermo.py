@@ -39,10 +39,13 @@ class relay:
         self.Cool_Pin=17
         self.Heat_Pin=18
         self.Fan_Pin=27
+        self.Garage_Pin=22
 
         GPIO.setup(self.Cool_Pin, GPIO.OUT)
         GPIO.setup(self.Heat_Pin, GPIO.OUT)
         GPIO.setup(self.Fan_Pin, GPIO.OUT)
+        GPIO.setup(self.Garage_Pin, GPIO.OUT)
+        GPIO.output(self.Garage_Pin, GPIO.HIGH) #Off
         self.run="off"
 
     def cool(self):
@@ -139,6 +142,12 @@ class temp(threading.Thread):
         self.THI=0
         self.RHout=0
         self.Tout=0
+
+    def garage(self):
+        GPIO.output(self.Garage_Pin, GPIO.LOW)
+        sleep(1)
+        GPIO.output(self.Garage_Pin, GPIO.HIGH)
+
 
     def run(self):
         while(self.loop):
