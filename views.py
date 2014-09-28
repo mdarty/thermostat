@@ -1,5 +1,5 @@
 #!/usr/bin/python2
-from flask import Flask, render_template, flash, redirect, request
+from flask import Flask, render_template, flash, redirect, request, send_file
 from flask.ext.wtf import Form
 from wtforms import TextField, BooleanField
 from wtforms.validators import Required
@@ -9,7 +9,7 @@ import sys, os, pickle, ConfigParser
 from lockfile import FileLock
 
 Config = ConfigParser.ConfigParser()
-Config.read('config.ini')
+Config.read('/root/thermostat/config.ini')
 directory=Config.get('thermo', 'directory')
 directory="/tmp/thermo"
 
@@ -101,6 +101,12 @@ def login():
         title = 'Sign In',
         form = form,
         providers = app.config['OPENID_PROVIDERS'])
+
+@app.route('/get_image')
+def get_image():
+    os.system('/opt/vc/bin/raspistill -vf -hf -o /tmp/thermo/image.jpg')
+    filename='/tmp/thermo/image.jpg'
+    return send_file(filename, mimetype='image/jpg')
 
 @app.route('/run_AC', methods = ['Get'])
 def run_AC():

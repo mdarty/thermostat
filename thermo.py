@@ -5,7 +5,7 @@ from lockfile import FileLock
 import datetime, sys, os, signal, pickle, threading, pywapi, os.path, pywapi, dhtreader, ConfigParser
 
 Config = ConfigParser.ConfigParser()
-Config.read('config.ini')
+Config.read('/root/thermostat/config.ini')
 ZIP=Config.get('thermo', 'ZIP')
 NOAA=Config.get('thermo','NOAA')
 directory=Config.get('thermo', 'directory')
