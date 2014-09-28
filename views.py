@@ -104,7 +104,7 @@ def login():
 
 @app.route('/get_image')
 def get_image():
-    os.system('/opt/vc/bin/raspistill -vf -hf -o /tmp/thermo/image.jpg')
+    os.system('/opt/vc/bin/raspistill -vf -hf -w 800 -h 600 -o /tmp/thermo/image.jpg')
     filename='/tmp/thermo/image.jpg'
     return send_file(filename, mimetype='image/jpg')
 
