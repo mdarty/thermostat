@@ -9,6 +9,7 @@ Config.read('config.ini')
 ZIP=Config.get('thermo', 'ZIP')
 NOAA=Config.get('thermo','NOAA')
 directory=Config.get('thermo', 'directory')
+directory="/tmp/thermo"
 log=Config.get('thermo', 'log')
 Cool_Pin=int(Config.get('thermo', 'Cool_Pin'))
 Heat_Pin=int(Config.get('thermo', 'Heat_Pin'))
@@ -67,6 +68,11 @@ class relay:
         GPIO.setup(self.Garage_Pin, GPIO.OUT)
         GPIO.output(self.Garage_Pin, GPIO.HIGH) #Off
         self.run="off"
+
+    def garage(self):
+        GPIO.output(self.Garage_Pin, GPIO.LOW)
+        sleep(1)
+        GPIO.output(self.Garage_Pin, GPIO.HIGH)
 
     def cool(self):
         GPIO.output(self.Heat_Pin, GPIO.HIGH) #Off
@@ -173,19 +179,16 @@ class temp(threading.Thread):
         self.hostname = ["192.168.1.27", "192.168.1.3"]
         
         global directory
-        #self.directory="/tmp/thermo"
         self.directory=directory
         if not os.path.exists(self.directory):
             os.makedirs(self.directory)
 
-    def garage(self):
-        GPIO.output(self.Garage_Pin, GPIO.LOW)
-        sleep(1)
-        GPIO.output(self.Garage_Pin, GPIO.HIGH)
-
-
     def run(self):
+        file_garage=self.directory+"garage"
         while(self.loop):
+            if os.path.isfile(file_garage):
+                self.relay.garage()
+                os.remove(file_garage)
             file_view=self.directory+"/view.obj"
             if os.path.isfile(file_view):
                 with FileLock(file_view):

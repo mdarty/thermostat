@@ -11,6 +11,7 @@ from lockfile import FileLock
 Config = ConfigParser.ConfigParser()
 Config.read('config.ini')
 directory=Config.get('thermo', 'directory')
+directory="/tmp/thermo"
 
 app=Flask(__name__)
 #CsrfProtect(app)
@@ -24,7 +25,7 @@ class LoginForm(Form):
 @app.route('/index')
 def index():
     global directory
-    #directory="/tmp/thermo"
+    print directory
     if not os.path.exists(directory):
         os.makedirs(directory)
     file_thermo=directory+"/thermo.obj"
@@ -46,47 +47,48 @@ def index():
 
 @app.route('/index', methods = ['POST'])
 def index_post():
+    global directory
+    #directory="/tmp/thermo"
+    file_view=directory+"/view.obj"
+    file_thermo=directory+"/thermo.obj"
+    file_garage=directory+"garage"
     print request.form
-    if request.method['submit'] == 'temp':
-        global directory
-        #directory="/tmp/thermo"
-        file_view=directory+"/view.obj"
-        file_thermo=directory+"/thermo.obj"
-        if not os.path.exists(directory):
-            os.makedirs(directory)
-        if os.path.isfile(file_view):
-            with FileLock(file_view):
-                file=open(file_view, 'rb')
-                views=pickle.load(file)
-                file.close()
-        elif os.path.isfile(file_thermo):
-            with FileLock(file_thermo):
-                file=open(file_thermo, 'rb')
-                views=pickle.load(file)
-                file.close()
-        else:
-            views=thermo()
-        views.mode=str(request.form['mode'])
-        views.set_temp=float(str(request.form['set_temp']))
-        views.state=str(request.form['state'])
-        views.set_away_temp=float(str(request.form['set_away_temp']))
-        views.set_away=str(request.form['set_away'])
-        if not os.path.exists(directory):
-            os.makedirs(directory)
-        file_view=directory+"/view.obj"
+    if request.form['submit'] == "Garage":
+        print "I'm here"
+        open(file_garage, 'a').close()
+    if not os.path.exists(directory):
+        os.makedirs(directory)
+    if os.path.isfile(file_view):
         with FileLock(file_view):
-            file=open(file_view, 'wb')
-            pickle.dump(views, file)
+            file=open(file_view, 'rb')
+            views=pickle.load(file)
             file.close()
+    elif os.path.isfile(file_thermo):
+        with FileLock(file_thermo):
+            file=open(file_thermo, 'rb')
+            views=pickle.load(file)
+            file.close()
+    else:
+        views=thermo()
+    views.mode=str(request.form['mode'])
+    views.set_temp=float(str(request.form['set_temp']))
+    views.state=str(request.form['state'])
+    views.set_away_temp=float(str(request.form['set_away_temp']))
+    views.set_away=str(request.form['set_away'])
+    if not os.path.exists(directory):
+        os.makedirs(directory)
+    file_view=directory+"/view.obj"
+    with FileLock(file_view):
+        file=open(file_view, 'wb')
+        pickle.dump(views, file)
+        file.close()
    
-        if os.path.isfile(file_thermo):
-            with FileLock(file_thermo):
-                file=open(file_thermo, 'rb')
-                thermo=pickle.load(file)
-                file.close()
-                return render_template("index.html", title="Thermostat", mode=thermo.mode, set_temp=thermo.set_temp, state=thermo.state, set_away_temp=thermo.set_away_temp, set_away=thermo.set_away)
-    elif request.method['sumbit'] == 'Garage':
-        temp.garage()
+    if os.path.isfile(file_thermo):
+        with FileLock(file_thermo):
+            file=open(file_thermo, 'rb')
+            thermo=pickle.load(file)
+            file.close()
+            return render_template("index.html", title="Thermostat", mode=thermo.mode, set_temp=thermo.set_temp, state=thermo.state, set_away_temp=thermo.set_away_temp, set_away=thermo.set_away)
     return render_template("index.html", title="Thermostat", mode=views.mode, set_temp=views.set_temp, state=views.state, set_away_temp=views.set_away_temp, set_away=views.set_away)
 
 @app.route('/login', methods = ['GET', 'POST'])
@@ -185,5 +187,5 @@ def restart():
     return 'restart'
 
 if __name__=="__main__":
-    #app.run("0.0.0.0", port=80, debug=True)
-    app.run("0.0.0.0", port=80)
+    app.run("0.0.0.0", port=80, debug=True)
+    #app.run("0.0.0.0", port=80)
