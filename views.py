@@ -7,6 +7,11 @@ from flask_wtf.csrf import CsrfProtect
 from thermo import temp, thermo
 import sys, os, pickle, ConfigParser
 from lockfile import FileLock
+#import picamera
+#camera = picamera.PiCamera()
+#camera.hflip=True
+#camera.vflip=True
+#camera.resolution = (1024, 768)
 
 Config = ConfigParser.ConfigParser()
 Config.read('/root/thermostat/config.ini')
@@ -106,6 +111,7 @@ def login():
 def get_image():
     os.system('/opt/vc/bin/raspistill -vf -hf -w 800 -h 600 -o /tmp/thermo/image.jpg')
     filename='/tmp/thermo/image.jpg'
+    #camera.capture(filename)
     return send_file(filename, mimetype='image/jpg')
 
 @app.route('/run_AC', methods = ['Get'])
