@@ -81,23 +81,23 @@
 {% block content %}
     <table>
         <tr>
-            <td></td>
-            <td>Temp</td>
-            <td>Humidity</td>
+            <th></th>
+            <th>Temp</th>
+            <th>Humidity</th>
         </tr>
         <tr>
-            <td>Indoor</td>
-            <td><span id="indoorTempDiv"></span>&deg;F</p></td>
-            <td><span id="indoorRHDiv"></span>%</p></td>
+            <th>Indoor</th>
+            <td><span id="indoorTempDiv"></span>&deg;F</td>
+            <td><span id="indoorRHDiv"></span>%</td>
         </tr>
         <tr>
-            <td>Outdoor</td>
-            <td><span id="outdoorTempDiv"></span>&deg;F</p></td>
-            <td><span id="outdoorRHDiv"></span>%</p></td>
+            <th>Outdoor</th>
+            <td><span id="outdoorTempDiv"></span>&deg;F</td>
+            <td><span id="outdoorRHDiv"></span>%</td>
         </tr>
     </table>
-    <p><h3>System:</h3><span id="run_AC"></span></p>
-    <p><h3>CPU Temp:</h3><span id="cpu_temp"></span>&deg;F</p>
+    <h3>System:</h3><span id="run_AC"></span>
+    <h3>CPU Temp:</h3><span id="cpu_temp"></span>&deg;F
     <form action="/index" method="POST" >
         <h3>Mode</h3>
         {% if mode == "cool" %}
@@ -145,10 +145,10 @@
             <input type="radio" name="set_away" value="off" checked>Off<br>
         {% endif %}
         <br>
-        Here: <input type="text" name="set_temp" size=2 value="{{set_temp}}"/>
-        Away: <input type="text" name="set_away_temp" size=2 value="{{set_away_temp}}"/>
+        <h3 class="inline">Here:</h3> <input type="text" name="set_temp" size=2 value="{{set_temp}}"/>
+        <h3 class="inline">Away:</h3> <input type="text" name="set_away_temp" size=2 value="{{set_away_temp}}"/>
         <button type="submit" name="submit" value="temp">Go</button>
         <button type="submit" name="submit" value="Garage">Garage</button>
     </form>
-    <img src="/get_image" height="600" width="800">
+    <img src="/get_image" height="600" width="800" alt="camera">
 {% endblock %}
