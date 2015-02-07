@@ -2,7 +2,9 @@
 import RPi.GPIO as GPIO
 from time import sleep
 from lockfile import FileLock
-import datetime, sys, os, signal, pickle, threading, pywapi, os.path, pywapi, dhtreader, ConfigParser
+#import cPickle as pickle
+import pickle
+import datetime, sys, os, signal, threading, pywapi, os.path, pywapi, dhtreader, ConfigParser
 
 Config = ConfigParser.ConfigParser()
 Config.read('/root/thermostat/config.ini')
@@ -184,17 +186,22 @@ class temp(threading.Thread):
             os.makedirs(self.directory)
 
     def run(self):
-        file_garage=self.directory+"garage"
+        file_garage=self.directory+"/garage"
         while(self.loop):
             if os.path.isfile(file_garage):
                 self.relay.garage()
                 os.remove(file_garage)
-            file_view=self.directory+"/view.obj"
+            #file_view=self.directory+"/view.obj"
+            file_view="/tmp/thermostat/view.obj"
             if os.path.isfile(file_view):
                 with FileLock(file_view):
-                    file=open(file_view, 'rb')
-                    self.views=pickle.load(file)
-                    file.close()
+                    #print file_view
+                    pfile=open(file_view, 'rb')
+                    #pfile.seek(0)
+                    #print pfile
+                    #print pickle.load(pfile)
+                    self.views=pickle.load(pfile)
+                    pfile.close()
                     self.thermo.mode=self.views.mode
                     self.thermo.set_temp=self.views.set_temp
                     self.thermo.state=self.views.state
@@ -281,7 +288,7 @@ class temp(threading.Thread):
             log_text+=','+str(self.relay.run)
             log_text+='\n'
             self.log_time=datetime.datetime.now()
-            log_file=open('./therm.log','w')
+            log_file=open('/var/log/therm.log','w')
             log_file.write(log_text)
             log_file.close()
 
@@ -296,7 +303,7 @@ class temp(threading.Thread):
             log_text+=','+str(self.relay.run)
             log_text+='\n'
             self.log_time=datetime.datetime.now()
-            log_file=open('./therm.log','a')
+            log_file=open('/var/log/therm.log','a')
             log_file.write(log_text)
             log_file.close()
 

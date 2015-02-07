@@ -5,7 +5,9 @@ from wtforms import TextField, BooleanField
 from wtforms.validators import Required
 from flask_wtf.csrf import CsrfProtect
 from thermo import temp, thermo
-import sys, os, pickle, ConfigParser
+#import cPickle as pickle
+import pickle, pprint
+import sys, os, ConfigParser
 from lockfile import FileLock
 #import picamera
 #camera = picamera.PiCamera()
@@ -56,7 +58,7 @@ def index_post():
     #directory="/tmp/thermo"
     file_view=directory+"/view.obj"
     file_thermo=directory+"/thermo.obj"
-    file_garage=directory+"garage"
+    file_garage=directory+"/garage"
     print request.form
     if request.form['submit'] == "Garage":
         print "I'm here"
@@ -82,9 +84,11 @@ def index_post():
     views.set_away=str(request.form['set_away'])
     if not os.path.exists(directory):
         os.makedirs(directory)
-    file_view=directory+"/view.obj"
+    #file_view=directory+"/view.obj"
+    #file_view="/tmp/thermostat/view.obj"
     with FileLock(file_view):
         file=open(file_view, 'wb')
+        pprint.pprint(views)
         pickle.dump(views, file)
         file.close()
    
