@@ -1,10 +1,10 @@
 #!/usr/bin/python2
 import RPi.GPIO as GPIO
 from time import sleep
-from lockfile import FileLock
-#import cPickle as pickle
-import pickle
-import datetime, sys, os, signal, threading, pywapi, os.path, pywapi, dhtreader, ConfigParser
+import datetime, sys, os, signal, threading, pywapi, os.path, pywapi, dhtreader
+import ConfigParser
+import psycopg2
+import picamera, io
 
 Config = ConfigParser.ConfigParser()
 Config.read('/root/thermostat/config.ini')
@@ -17,7 +17,6 @@ Cool_Pin=int(Config.get('thermo', 'Cool_Pin'))
 Heat_Pin=int(Config.get('thermo', 'Heat_Pin'))
 Fan_Pin=int(Config.get('thermo', 'Fan_Pin'))
 Garage_Pin=int(Config.get('thermo', 'Garage_Pin'))
-
 
 Stop=False
 def sig_handler(signum, frame):
@@ -178,46 +177,69 @@ class temp(threading.Thread):
         self.log_time=datetime.datetime.now()-datetime.timedelta(minutes=self.log_int)
         self.run_int=15
         self.run_time=datetime.datetime.now()-datetime.timedelta(minutes=self.run_int)
+        self.pic_int=5
+        self.pic_time=datetime.datetime.now()-datetime.timedelta(minutes=self.pic_int)
         self.hostname = ["192.168.1.27", "192.168.1.3"]
+        self.conn = psycopg2.connect("dbname='thermo' user='thermo' host='localhost' password='chaaCoh9'")
+        self.cur = self.conn.cursor()
         
-        global directory
-        self.directory=directory
-        if not os.path.exists(self.directory):
-            os.makedirs(self.directory)
+        #global directory
+        #self.directory=directory
+        #if not os.path.exists(self.directory):
+        #    os.makedirs(self.directory)
 
     def run(self):
-        file_garage=self.directory+"/garage"
         while(self.loop):
-            if os.path.isfile(file_garage):
-                self.relay.garage()
-                os.remove(file_garage)
+            #if os.path.isfile(file_garage):
+            #    self.relay.garage()
+            #    os.remove(file_garage)
             #file_view=self.directory+"/view.obj"
-            file_view="/tmp/thermostat/view.obj"
-            if os.path.isfile(file_view):
-                with FileLock(file_view):
-                    #print file_view
-                    pfile=open(file_view, 'rb')
-                    #pfile.seek(0)
-                    #print pfile
-                    #print pickle.load(pfile)
-                    self.views=pickle.load(pfile)
-                    pfile.close()
-                    self.thermo.mode=self.views.mode
-                    self.thermo.set_temp=self.views.set_temp
-                    self.thermo.state=self.views.state
-                    self.thermo.set_away_temp=self.views.set_away_temp
-                    self.thermo.set_away=self.views.set_away
+            #file_view="/tmp/thermostat/view.obj"
+            #if os.path.isfile(file_view):
+            #    with FileLock(file_view):
+            #        #print file_view
+            #        pfile=open(file_view, 'rb')
+            #        #pfile.seek(0)
+            #        #print pfile
+            #        #print pickle.load(pfile)
+            #        self.views=pickle.load(pfile)
+            #        pfile.close()
+            #        self.thermo.mode=self.views.mode
+            #        self.thermo.set_temp=self.views.set_temp
+            #        self.thermo.state=self.views.state
+            #        self.thermo.set_away_temp=self.views.set_away_temp
+            #        self.thermo.set_away=self.views.set_away
+            self.cur.execute("SELECT mode, set_temp, state, set_away_temp, set_away, garage FROM thermo_state;")
+            (self.thermo.mode,self.thermo.set_temp,self.thermo.state,self.thermo.set_away_temp,self.thermo.set_away, garage)=self.cur.fetchone()
+            if garage == "on":
+                self.relay.garage()
+                garage = "off"
+                self.cur.execute("""UPDATE thermo_state SET garage = %s;""", (garage, ))
             self.thermo.run=self.relay.run
-            file_thermo=self.directory+"/thermo.obj"
+            #file_thermo=self.directory+"/thermo.obj"
             self.read_cpu_temp()
             self.thermo.cpu_temp=self.cpu_temp
             self.thermo.T, self.thermo.RH, self.thermo.THI=self.sensor.read()
             if datetime.datetime.now()-self.run_time>=datetime.timedelta(minutes=self.run_int):
                 self.thermo.Tout, self.thermo.RHout=outdoor()
-            with FileLock(file_thermo):
-                file=open(file_thermo, 'wb')
-                pickle.dump(self.thermo, file)
-                file.close()
+
+            if datetime.datetime.now()-self.pic_time>=datetime.timedelta(minutes=self.pic_int):
+                #my_stream=io.BytesIO()
+                with picamera.PiCamera() as camera:
+                    camera.led=False
+                    camera.start_preview()
+                    sleep(2)
+                    camera.capture('/tmp/thermo/image.jpg')
+                    #camera.capture(my_stream, 'jpeg')
+                #picture=my_stream.getvalue()
+            #with FileLock(file_thermo):
+            #    file=open(file_thermo, 'wb')
+            #    pickle.dump(self.thermo, file)
+            #    file.close()
+            #self.cur.execute("""UPDATE thermo_state SET cpu_temp = %s, T = %s, RH = %s, THI= %s, garage = %s, picture = %s;""", (self.thermo.cpu_temp, self.thermo.T, self.thermo.RH, self.thermo.THI, garage, psycopg2.Binary(picture)))
+            self.cur.execute("""UPDATE thermo_state SET cpu_temp = %s, T = %s, RH = %s, THI= %s, Tout=%s, RHout=%s, run=%s""", (self.thermo.cpu_temp, self.thermo.T, self.thermo.RH, self.thermo.THI, self.thermo.Tout, self.thermo.RHout, self.thermo.run))
+            self.conn.commit()
+
             if self.thermo.active=="auto":
                 self.home()
 
@@ -269,43 +291,45 @@ class temp(threading.Thread):
         self.loop=False
 
     def log(self):
-            
-        if not os.path.isfile('./therm.log'): 
-            log_text='Time,'
-            log_text+='T,RH,THI'
-            log_text+=',hist'
-            log_text+=',desired_temp'
-            log_text+=',state'
-            log_text+=',mode'
-            log_text+=',relay'
-            log_text+='\n'
-            log_text+=str(datetime.datetime.now())+','
-            log_text+=str(self.thermo.T)+','+str(self.thermo.RH)+','+str(self.thermo.THI)
-            log_text+=','+str(self.hist)
-            log_text+=','+str(self.desired_temp)
-            log_text+=','+str(self.thermo.state)
-            log_text+=','+str(self.thermo.mode)
-            log_text+=','+str(self.relay.run)
-            log_text+='\n'
-            self.log_time=datetime.datetime.now()
-            log_file=open('/var/log/therm.log','w')
-            log_file.write(log_text)
-            log_file.close()
+        self.cur.execute("""INSERT INTO thermo_log (Time,T,RH,THI,hist,desired_temp,state,mode,relay) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s);""",(datetime.datetime.now(), self.thermo.T, self.thermo.RH, self.thermo.THI, self.hist, self.desired_temp, self.thermo.state, self.thermo.mode, self.relay.run))
+        self.conn.commit()
+
+        #if not os.path.isfile('./therm.log'): 
+        #    log_text='Time,'
+        #    log_text+='T,RH,THI'
+        #    log_text+=',hist'
+        #    log_text+=',desired_temp'
+        #    log_text+=',state'
+        #    log_text+=',mode'
+        #    log_text+=',relay'
+        #    log_text+='\n'
+        #    log_text+=str(datetime.datetime.now())+','
+        #    log_text+=str(self.thermo.T)+','+str(self.thermo.RH)+','+str(self.thermo.THI)
+        #    log_text+=','+str(self.hist)
+        #    log_text+=','+str(self.desired_temp)
+        #    log_text+=','+str(self.thermo.state)
+        #    log_text+=','+str(self.thermo.mode)
+        #    log_text+=','+str(self.relay.run)
+        #    log_text+='\n'
+        #    self.log_time=datetime.datetime.now()
+        #    log_file=open('/var/log/therm.log','w')
+        #    log_file.write(log_text)
+        #    log_file.close()
 
  
-        else:
-            log_text=str(datetime.datetime.now())+','
-            log_text+=str(self.thermo.T)+','+str(self.thermo.RH)+','+str(self.thermo.THI)
-            log_text+=','+str(self.hist)
-            log_text+=','+str(self.desired_temp)
-            log_text+=','+str(self.thermo.state)
-            log_text+=','+str(self.thermo.mode)
-            log_text+=','+str(self.relay.run)
-            log_text+='\n'
-            self.log_time=datetime.datetime.now()
-            log_file=open('/var/log/therm.log','a')
-            log_file.write(log_text)
-            log_file.close()
+        #else:
+        #    log_text=str(datetime.datetime.now())+','
+        #    log_text+=str(self.thermo.T)+','+str(self.thermo.RH)+','+str(self.thermo.THI)
+        #    log_text+=','+str(self.hist)
+        #    log_text+=','+str(self.desired_temp)
+        #    log_text+=','+str(self.thermo.state)
+        #    log_text+=','+str(self.thermo.mode)
+        #    log_text+=','+str(self.relay.run)
+        #    log_text+='\n'
+        #    self.log_time=datetime.datetime.now()
+        #    log_file=open('/var/log/therm.log','a')
+        #    log_file.write(log_text)
+        #    log_file.close()
 
     def home(self):
         self.state="away"
