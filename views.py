@@ -5,10 +5,7 @@ from wtforms import TextField, BooleanField
 from wtforms.validators import Required
 from flask_wtf.csrf import CsrfProtect
 from thermo import temp, thermo
-#import cPickle as pickle
-import pickle, pprint
 import sys, os, ConfigParser
-from lockfile import FileLock
 import psycopg2
 #import picamera
 #camera = picamera.PiCamera()
@@ -35,64 +32,19 @@ class LoginForm(Form):
 @app.route('/')
 @app.route('/index')
 def index():
-    #global directory
-    #print directory
-    #if not os.path.exists(directory):
-    #    os.makedirs(directory)
-    #file_thermo=directory+"/thermo.obj"
-    #file_view=directory+"/view.obj"
-    #if os.path.isfile(file_thermo):
-    #    with FileLock(file_thermo):
-    #        file=open(file_thermo, 'rb')
-    #        thermo=pickle.load(file)
-    #        file.close()
     cur.execute("SELECT mode, set_temp, state, set_away_temp, set_away FROM thermo_state;")
     (mode, set_temp, state, set_away_temp, set_away)=cur.fetchone()
     return render_template("index.html", title="Thermostat", mode=mode, set_temp=set_temp, state=state, set_away_temp=set_away_temp, set_away=set_away)
-    #elif os.path.isfile(file_view):
-    #    with FileLock(file_views):
-    #        file=open(file_views, 'rb')
-    #        views=pickle.load(file)
-    #        file.close()
-    #else:
-    #    views=thermo()
-    #return render_template("index.html", title="Thermostat", mode=views.mode, set_temp=views.set_temp, state=views.state, set_away_temp=views.set_away_temp, set_away=views.set_away)
 
 @app.route('/index', methods = ['POST'])
 def index_post():
-    #global directory
-    #directory="/tmp/thermo"
-    #file_view=directory+"/view.obj"
-    #file_thermo=directory+"/thermo.obj"
-    #file_garage=directory+"/garage"
-    #print request.form
     if request.form['submit'] == "Garage":
-    #    print "I'm here"
-    #    open(file_garage, 'a').close()
         garage="on"
-    #if not os.path.exists(directory):
-    #    os.makedirs(directory)
-    #if os.path.isfile(file_view):
-    #    with FileLock(file_view):
-    #        file=open(file_view, 'rb')
-    #        views=pickle.load(file)
-    #        file.close()
-    #elif os.path.isfile(file_thermo):
-    #    with FileLock(file_thermo):
-    #        file=open(file_thermo, 'rb')
-    #        views=pickle.load(file)
-    #        file.close()
-    #else:
-    #    views=thermo()
     mode=str(request.form['mode'])
     set_temp=float(str(request.form['set_temp']))
     state=str(request.form['state'])
     set_away_temp=float(str(request.form['set_away_temp']))
     set_away=str(request.form['set_away'])
-    #if not os.path.exists(directory):
-    #    os.makedirs(directory)
-    #file_view=directory+"/view.obj"
-    #file_view="/tmp/thermostat/view.obj"
     cur.execute("""UPDATE thermo_state SET 
         mode = %s,
         set_temp = %s,
@@ -102,19 +54,6 @@ def index_post():
         garage = %s;""",(mode, set_temp, state, set_away_temp, set_away, garage))
     conn.commit()
     return render_template("index.html", title="Thermostat", mode=mode, set_temp=set_temp, state=state, set_away_temp=set_away_temp, set_away=set_away)
-    #with FileLock(file_view):
-    #    file=open(file_view, 'wb')
-    #    pprint.pprint(views)
-    #    pickle.dump(views, file)
-    #    file.close()
-   
-    #if os.path.isfile(file_thermo):
-    #    with FileLock(file_thermo):
-    #        file=open(file_thermo, 'rb')
-    #        thermo=pickle.load(file)
-    #        file.close()
-    #        return render_template("index.html", title="Thermostat", mode=thermo.mode, set_temp=thermo.set_temp, state=thermo.state, set_away_temp=thermo.set_away_temp, set_away=thermo.set_away)
-    #return render_template("index.html", title="Thermostat", mode=views.mode, set_temp=views.set_temp, state=views.state, set_away_temp=views.set_away_temp, set_away=views.set_away)
 
 @app.route('/login', methods = ['GET', 'POST'])
 def login():
@@ -144,84 +83,36 @@ def get_image():
 def run_AC():
     cur.execute("SELECT run FROM thermo_state;")
     run=cur.fetchone()[0]
-    #directory="/tmp/thermo"
-    #global directory
-    #file_thermo=directory+"/thermo.obj"
-    #if os.path.isfile(file_thermo):
-    #    with FileLock(file_thermo):
-    #        file=open(file_thermo, 'rb')
-    #        thermo=pickle.load(file)
-    #        file.close()
     return str(run)
 
 @app.route('/updatetemp', methods = ['Get'])
 def updatetemp():
     cur.execute("SELECT T FROM thermo_state;")
     T=cur.fetchone()[0]
-    #directory="/tmp/thermo"
-    #global directory
-    #file_thermo=directory+"/thermo.obj"
-    #if os.path.isfile(file_thermo):
-    #    with FileLock(file_thermo):
-    #        file=open(file_thermo, 'rb')
-    #        thermo=pickle.load(file)
-    #        file.close()
     return str(T)
 
 @app.route('/updateRH', methods = ['Get'])
 def updateRH():
     cur.execute("SELECT RH FROM thermo_state;")
     RH=cur.fetchone()[0]
-    #directory="/tmp/thermo"
-    #global directory
-    #file_thermo=directory+"/thermo.obj"
-    #if os.path.isfile(file_thermo):
-    #    with FileLock(file_thermo):
-    #        file=open(file_thermo, 'rb')
-    #        thermo=pickle.load(file)
-    #        file.close()
     return str(RH)
 
 @app.route('/updateOuttemp', methods = ['Get'])
 def updateOuttemp():
     cur.execute("SELECT Tout FROM thermo_state;")
     Tout=cur.fetchone()[0]
-    #directory="/tmp/thermo"
-    #global directory
-    #file_thermo=directory+"/thermo.obj"
-    #if os.path.isfile(file_thermo):
-    #    with FileLock(file_thermo):
-    #        file=open(file_thermo, 'rb')
-    #        thermo=pickle.load(file)
-    #        file.close()
     return str(Tout)
 
 @app.route('/updateOutRH', methods = ['Get'])
 def updateOutRH():
     cur.execute("SELECT RHout FROM thermo_state;")
     RHout=cur.fetchone()[0]
-    #directory="/tmp/thermo"
-    #global directory
-    #file_thermo=directory+"/thermo.obj"
-    #if os.path.isfile(file_thermo):
-    #    with FileLock(file_thermo):
-    #        file=open(file_thermo, 'rb')
-    #        thermo=pickle.load(file)
-    #        file.close()
     return str(RHout)
 
 @app.route('/cputemp', methods = ['Get'])
 def cputemp():
     cur.execute("SELECT cpu_temp FROM thermo_state;")
     cpu_temp=cur.fetchone()[0]
-    #directory="/tmp/thermo"
-    #global directory
-    #file_thermo=directory+"/thermo.obj"
-    #if os.path.isfile(file_thermo):
-    #    with FileLock(file_thermo):
-    #        file=open(file_thermo, 'rb')
-    #        thermo=pickle.load(file)
-    #        file.close()
     return str(cpu_temp)
 
 @app.route('/stop', methods = ['Get'])
