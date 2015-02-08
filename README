@@ -3,6 +3,14 @@ Requirements:
     dhtreader
     pywapi
     flask
+    psycopg2
+    postgresql
+    nginx
+    uwsgi
+    uwsgi-python
+    matplotlib
+    numpy
+    picamera
 
 pywapi:
     wget https://launchpad.net/python-weather-api/trunk/0.3.8/+download/pywapi-0.3.8.tar.gz

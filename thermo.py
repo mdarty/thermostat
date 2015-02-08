@@ -4,7 +4,10 @@ from time import sleep
 import datetime, sys, os, signal, threading, pywapi, os.path, pywapi, dhtreader
 import ConfigParser
 import psycopg2
-import picamera, io
+import picamera, io, numpy
+import matplotlib as mpl
+mpl.use('Agg')
+import matplotlib.pyplot as plt
 
 Config = ConfigParser.ConfigParser()
 Config.read('/root/thermostat/config.ini')
@@ -203,6 +206,8 @@ class temp(threading.Thread):
                 with picamera.PiCamera() as camera:
                     camera.led=False
                     camera.start_preview()
+                    camera.vflip = True
+                    camera.hflip = True
                     sleep(2)
                     camera.capture('/tmp/thermo/image.jpg')
                     #camera.capture(my_stream, 'jpeg')
@@ -262,9 +267,37 @@ class temp(threading.Thread):
         self.loop=False
 
     def log(self):
-        self.cur.execute("""INSERT INTO thermo_log (Time,T,RH,THI,hist,desired_temp,state,mode,relay) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s);""",(datetime.datetime.now(), self.thermo.T, self.thermo.RH, self.thermo.THI, self.hist, self.desired_temp, self.thermo.state, self.thermo.mode, self.relay.run))
+        self.cur.execute("""INSERT INTO thermo_log (Time,T,RH,Tout,RHout,THI,hist,desired_temp,state,mode,relay) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);""",(datetime.datetime.now(), self.thermo.T, self.thermo.RH, self.thermo.Tout, self.thermo.RHout, self.thermo.THI, self.hist, self.desired_temp, self.thermo.state, self.thermo.mode, self.relay.run))
         self.conn.commit()
-        self.log_time=date.datetime.now()
+        self.log_time=datetime.datetime.now()
+
+        entrys=150
+        self.cur.execute("""SELECT Time,T,desired_temp,Tout FROM thermo_log WHERE Time >= NOW() - '1 day'::INTERVAL ORDER BY Time LIMIT %s;""", (entrys, ))
+        data=self.cur.fetchall()
+        entrys=len(data)
+
+        Time=numpy.empty(entrys)
+        T=numpy.empty(entrys)
+        desired_temp=numpy.empty(entrys)
+        Tout=numpy.empty(entrys)
+
+        for i, row in enumerate(data):
+           #print(row[0].isoformat())
+           #print(row)
+           Time[i]=(row[0]-data[0][0]).total_seconds()/3600
+           T[i]=row[1]
+           desired_temp[i]=row[2]
+           Tout[i]=row[3]
+
+        fig=plt.figure()
+        plt.plot(Time, T, Time, desired_temp, Time, Tout)
+        plt.title('History')
+        plt.xlabel('Time')
+        plt.ylabel('Temp (f)')
+        #fig.autofmt_xdate()
+        #fig.fmt_xdata=mlp.dates.DateFormatter('')
+        plt.savefig('/tmp/thermo/graph.png')
+        plt.close()
 
     def home(self):
         self.state="away"

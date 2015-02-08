@@ -4,7 +4,7 @@ from flask.ext.wtf import Form
 from wtforms import TextField, BooleanField
 from wtforms.validators import Required
 from flask_wtf.csrf import CsrfProtect
-from thermo import temp, thermo
+#from thermo import temp, thermo
 import sys, os, ConfigParser
 import psycopg2
 #import picamera
@@ -23,6 +23,7 @@ Config.read('/root/thermostat/config.ini')
 
 app=Flask(__name__)
 #CsrfProtect(app)
+#app.debug=True
 app.config.from_object('config')
 
 class LoginForm(Form):
@@ -78,6 +79,11 @@ def get_image():
     #response.headers['Content-Type'] = 'image/jpeg'
     #response.headers['Content-Disposition'] = 'attachment; filename=image.jpg'
     #return response
+
+@app.route('/get_graph')
+def get_graph():
+    filename='/tmp/thermo/graph.png'
+    return send_file(filename, mimetype='image/png')
 
 @app.route('/run_AC', methods = ['Get'])
 def run_AC():
