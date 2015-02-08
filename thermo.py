@@ -206,8 +206,8 @@ class temp(threading.Thread):
                     sleep(2)
                     camera.capture('/tmp/thermo/image.jpg')
                     #camera.capture(my_stream, 'jpeg')
-                #picture=my_stream.getvalue()
-            #self.cur.execute("""UPDATE thermo_state SET cpu_temp = %s, T = %s, RH = %s, THI= %s, garage = %s, picture = %s;""", (self.thermo.cpu_temp, self.thermo.T, self.thermo.RH, self.thermo.THI, garage, psycopg2.Binary(picture)))
+                    #picture=my_stream.getvalue()
+                    #self.cur.execute("""UPDATE thermo_state SET picture = %s;""", (psycopg2.Binary(picture), ))
             self.cur.execute("""UPDATE thermo_state SET cpu_temp = %s, T = %s, RH = %s, THI= %s, Tout=%s, RHout=%s, run=%s""", (self.thermo.cpu_temp, self.thermo.T, self.thermo.RH, self.thermo.THI, self.thermo.Tout, self.thermo.RHout, self.thermo.run))
             self.conn.commit()
 
@@ -264,6 +264,7 @@ class temp(threading.Thread):
     def log(self):
         self.cur.execute("""INSERT INTO thermo_log (Time,T,RH,THI,hist,desired_temp,state,mode,relay) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s);""",(datetime.datetime.now(), self.thermo.T, self.thermo.RH, self.thermo.THI, self.hist, self.desired_temp, self.thermo.state, self.thermo.mode, self.relay.run))
         self.conn.commit()
+        self.log_time=date.datetime.now()
 
     def home(self):
         self.state="away"
