@@ -22,6 +22,10 @@ Fan_Pin=int(Config.get('thermo', 'Fan_Pin'))
 Garage_Pin=int(Config.get('thermo', 'Garage_Pin'))
 
 Stop=False
+
+Debug=False
+Database=False
+
 def sig_handler(signum, frame):
     global Stop
     Stop=True
@@ -170,6 +174,8 @@ class thermo:
 
 class temp(threading.Thread):
     def __init__(self):
+        global Debug
+        global Database
         threading.Thread.__init__(self)
         self.relay=relay()
         self.sensor=DHT()
@@ -183,27 +189,69 @@ class temp(threading.Thread):
         self.pic_int=5
         self.pic_time=datetime.datetime.now()-datetime.timedelta(minutes=self.pic_int)
         self.hostname = ["192.168.1.27", "192.168.1.3"]
-        self.conn = psycopg2.connect("dbname='thermo' user='thermo' host='localhost' password='chaaCoh9'")
+        if Debug or Database:
+            print "Connecting to Database"
+        self.conn = psycopg2.connect("dbname='thermo' user='thermo' host='localhost' password='chaaCoh9' options='-c statement_timeout=1000'")
         self.cur = self.conn.cursor()
-        
+        folder = "/tmp/thermo"
+        if not os.path.exists(folder):
+            os.makedirs(folder)
+
     def run(self):
+        global Debug
+        global Database
         while(self.loop):
-            self.cur.execute("SELECT mode, set_temp, state, set_away_temp, set_away, garage FROM thermo_state;")
-            (self.thermo.mode,self.thermo.set_temp,self.thermo.state,self.thermo.set_away_temp,self.thermo.set_away, garage)=self.cur.fetchone()
+            if Debug:
+                print "Starting Loop"
+            try:
+                self.cur.execute("SELECT mode, set_temp, state, set_away_temp, set_away, garage FROM thermo_state;")
+                (self.thermo.mode,self.thermo.set_temp,self.thermo.state,self.thermo.set_away_temp,self.thermo.set_away, garage)=self.cur.fetchone()
+                sleep(.1)
+            except:
+                if Debug or Database:
+                    print "Database TimeOut Trying to establish connection"
+                self.cur.close()
+                self.conn.close()
+                self.conn = psycopg2.connect("dbname='thermo' user='thermo' host='localhost' password='chaaCoh9' options='-c statement_timeout=1000'")
+                self.cur = self.conn.cursor()
+                self.cur.execute("SELECT mode, set_temp, state, set_away_temp, set_away, garage FROM thermo_state;")
+                (self.thermo.mode,self.thermo.set_temp,self.thermo.state,self.thermo.set_away_temp,self.thermo.set_away, garage)=self.cur.fetchone()
+            if Debug:
+                print "Garage"
             if garage == "on":
+                if Debug:
+                    print "Opening Garage"
                 self.relay.garage()
                 garage = "off"
-                self.cur.execute("""UPDATE thermo_state SET garage = %s;""", (garage, ))
+                try:
+                    self.cur.execute("""UPDATE thermo_state SET garage = %s;""", (garage, ))
+                    sleep(.1)
+                except:
+                    if Debug or Database:
+                        print "Database TimeOut Trying to establish connection"
+                    self.cur.close()
+                    self.conn.close()
+                    self.conn = psycopg2.connect("dbname='thermo' user='thermo' host='localhost' password='chaaCoh9' options='-c statement_timeout=1000'")
+                    self.cur = self.conn.cursor()
+                    self.cur.execute("""UPDATE thermo_state SET garage = %s;""", (garage, ))
+            else:
+                sleep(.5)
+            if Debug:
+                print "Reading Sensors"
             self.thermo.run=self.relay.run
             self.read_cpu_temp()
             self.thermo.cpu_temp=self.cpu_temp
             self.thermo.T, self.thermo.RH, self.thermo.THI=self.sensor.read()
             if datetime.datetime.now()-self.run_time>=datetime.timedelta(minutes=self.run_int):
                 self.thermo.Tout, self.thermo.RHout=outdoor()
+            else:
+                sleep(0.5)
 
             if datetime.datetime.now()-self.pic_time>=datetime.timedelta(minutes=self.pic_int):
                 #my_stream=io.BytesIO()
                 with picamera.PiCamera() as camera:
+                    if Debug:
+                        print "Taking Picture"
                     camera.led=False
                     camera.start_preview()
                     camera.vflip = True
@@ -213,11 +261,30 @@ class temp(threading.Thread):
                     #camera.capture(my_stream, 'jpeg')
                     #picture=my_stream.getvalue()
                     #self.cur.execute("""UPDATE thermo_state SET picture = %s;""", (psycopg2.Binary(picture), ))
-            self.cur.execute("""UPDATE thermo_state SET cpu_temp = %s, T = %s, RH = %s, THI= %s, Tout=%s, RHout=%s, run=%s""", (self.thermo.cpu_temp, self.thermo.T, self.thermo.RH, self.thermo.THI, self.thermo.Tout, self.thermo.RHout, self.thermo.run))
-            self.conn.commit()
+                    self.pic_time=datetime.datetime.now()
+            else:
+                sleep(0.5)
+            if Debug:
+                print "Updating Database"
+            try:
+                self.cur.execute("""UPDATE thermo_state SET cpu_temp = %s, T = %s, RH = %s, THI= %s, Tout=%s, RHout=%s, run=%s""", (self.thermo.cpu_temp, self.thermo.T, self.thermo.RH, self.thermo.THI, self.thermo.Tout, self.thermo.RHout, self.thermo.run))
+                self.conn.commit()
+                sleep(0.1)
+            except:
+                if Debug or Database:
+                    print "Database TimeOut Trying to establish connection"
+                self.cur.close()
+                self.conn.close()
+                self.conn = psycopg2.connect("dbname='thermo' user='thermo' host='localhost' password='chaaCoh9' options='-c statement_timeout=1000'")
+                self.cur.execute("""UPDATE thermo_state SET cpu_temp = %s, T = %s, RH = %s, THI= %s, Tout=%s, RHout=%s, run=%s""", (self.thermo.cpu_temp, self.thermo.T, self.thermo.RH, self.thermo.THI, self.thermo.Tout, self.thermo.RHout, self.thermo.run))
+                self.conn.commit()
 
+            if Debug:
+                print "Home/Away"
             if self.thermo.active=="auto":
                 self.home()
+            else:
+                sleep(0.5)
 
             if self.thermo.state=="here" or self.thermo.state=="home":
                 self.hist=self.thermo.active_hist
@@ -228,6 +295,8 @@ class temp(threading.Thread):
             else:
                 print "State broke"
 
+            if Debug:
+                print "Cool/Heat/Fan"
             if self.thermo.mode=="cool":
                 if self.thermo.THI > self.desired_temp + self.hist and self.relay.run != "cool":
                     self.relay.cool()
@@ -250,13 +319,22 @@ class temp(threading.Thread):
                     self.log()
             elif self.thermo.mode=="off" and self.relay.run != "off":
                 self.relay.off()
+                self.log()
             elif self.thermo.mode=="fan" and self.relay.run != "fan":
                 self.relay.fan()
+                self.log()
+            else:
+                sleep(0.1)
             if (datetime.datetime.now()-self.log_time>=datetime.timedelta(minutes=self.log_int)):
                 self.log()
-            if self.loop:
-                sleep(.5)
+            else:
+                sleep(0.5)
+            #if self.loop:
+                #sleep(0.5)
+                #sleep(1)
         del self.relay
+        self.cur.close()
+        self.conn.close()
         self.sensor.stop()
         self.sensor.join()
 
@@ -267,19 +345,48 @@ class temp(threading.Thread):
         self.loop=False
 
     def log(self):
-        self.cur.execute("""INSERT INTO thermo_log (Time,T,RH,Tout,RHout,THI,hist,desired_temp,state,mode,relay) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);""",(datetime.datetime.now(), self.thermo.T, self.thermo.RH, self.thermo.Tout, self.thermo.RHout, self.thermo.THI, self.hist, self.desired_temp, self.thermo.state, self.thermo.mode, self.relay.run))
-        self.conn.commit()
+        global Debug
+        global Database
+        if Debug:
+            print "Log"
+        try:
+            self.cur.execute("""INSERT INTO thermo_log (Time,T,RH,Tout,RHout,THI,hist,desired_temp,state,mode,relay) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);""",(datetime.datetime.now(), self.thermo.T, self.thermo.RH, self.thermo.Tout, self.thermo.RHout, self.thermo.THI, self.hist, self.desired_temp, self.thermo.state, self.thermo.mode, self.relay.run))
+            self.conn.commit()
+            sleep(0.1)
+        except:
+            if Debug or Database:
+                print "Database TimeOut Trying to establish connection"
+            self.cur.close()
+            self.conn.close()
+            self.conn = psycopg2.connect("dbname='thermo' user='thermo' host='localhost' password='chaaCoh9' options='-c statement_timeout=1000'")
+            self.cur.execute("""INSERT INTO thermo_log (Time,T,RH,Tout,RHout,THI,hist,desired_temp,state,mode,relay) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);""",(datetime.datetime.now(), self.thermo.T, self.thermo.RH, self.thermo.Tout, self.thermo.RHout, self.thermo.THI, self.hist, self.desired_temp, self.thermo.state, self.thermo.mode, self.relay.run))
+            self.conn.commit()
+
         self.log_time=datetime.datetime.now()
 
         entrys=150
-        self.cur.execute("""SELECT Time,T,desired_temp,Tout FROM thermo_log WHERE Time >= NOW() - '1 day'::INTERVAL ORDER BY Time LIMIT %s;""", (entrys, ))
-        data=self.cur.fetchall()
+        try:
+            self.cur.execute("""SELECT Time,T,desired_temp,Tout FROM thermo_log WHERE Time >= NOW() - '1 day'::INTERVAL ORDER BY Time LIMIT %s;""", (entrys, ))
+            data=self.cur.fetchall()
+            sleep(0.1)
+        except:
+            if Debug or Database:
+                print "Database TimeOut Trying to establish connection"
+            self.cur.close()
+            self.conn.close()
+            self.conn = psycopg2.connect("dbname='thermo' user='thermo' host='localhost' password='chaaCoh9' options='-c statement_timeout=1000'")
+            self.cur.execute("""SELECT Time,T,desired_temp,Tout FROM thermo_log WHERE Time >= NOW() - '1 day'::INTERVAL ORDER BY Time LIMIT %s;""", (entrys, ))
+            data=self.cur.fetchall()
+
         entrys=len(data)
 
         Time=numpy.empty(entrys)
         T=numpy.empty(entrys)
         desired_temp=numpy.empty(entrys)
         Tout=numpy.empty(entrys)
+
+        if Debug:
+            print "Generate Graph"
 
         for i, row in enumerate(data):
            #print(row[0].isoformat())
@@ -313,16 +420,23 @@ class temp(threading.Thread):
             if not self.loop:
                 del self.relay
                 del self.sensor
+                break
 
     def read_cpu_temp(self):
         temp_file=open('/sys/class/thermal/thermal_zone0/temp','r')
         self.cpu_temp=int(temp_file.read())*9/5000+32
         temp_file.close()
-        if self.cpu_temp>130:
+        if self.cpu_temp>185:
             print "I'm burning up"
 
 def main():
+    global Debug
+    global Database
     print "PID: "+str(os.getpid())
+    if Debug:
+        print "Debug"
+    if Database:
+        print "Database"
     t=temp()
     t.start()
     while True:
@@ -334,7 +448,12 @@ def main():
             break
         if not t.isAlive():
             print "The thread is Dead"
+            break
     sys.exit(0)
 
 if __name__=="__main__":
+    if sys.argv[1] == 'Debug':
+        Debug=True
+    if sys.argv[1] == 'Database':
+        Database=True
     main()
