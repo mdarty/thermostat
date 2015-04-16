@@ -41,6 +41,8 @@ def index():
 def index_post():
     if request.form['submit'] == "Garage":
         garage="on"
+    else:
+        garage="off"
     mode=str(request.form['mode'])
     set_temp=float(str(request.form['set_temp']))
     state=str(request.form['state'])
@@ -135,5 +137,5 @@ def restart():
 
 if __name__=="__main__":
     #app.run("192.168.15.11", port=80, debug=True)
-    ##app.run("0.0.0.0", port=80, debug=True)
+    #app.run("0.0.0.0", port=80, debug=True)
     app.run("0.0.0.0", port=80)

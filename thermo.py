@@ -73,6 +73,7 @@ class relay:
         GPIO.setup(self.Cool_Pin, GPIO.OUT)
         GPIO.setup(self.Heat_Pin, GPIO.OUT)
         GPIO.setup(self.Fan_Pin, GPIO.OUT)
+        self.off()
         GPIO.setup(self.Garage_Pin, GPIO.OUT)
         GPIO.output(self.Garage_Pin, GPIO.HIGH) #Off
         self.run="off"
@@ -237,10 +238,14 @@ class temp(threading.Thread):
             else:
                 sleep(.5)
             if Debug:
-                print "Reading Sensors"
+                print "Relay"
             self.thermo.run=self.relay.run
+            if Debug:
+                print "CPU Temp"
             self.read_cpu_temp()
             self.thermo.cpu_temp=self.cpu_temp
+            if Debug:
+                print "Sensor Read"
             self.thermo.T, self.thermo.RH, self.thermo.THI=self.sensor.read()
             if datetime.datetime.now()-self.run_time>=datetime.timedelta(minutes=self.run_int):
                 self.thermo.Tout, self.thermo.RHout=outdoor()
@@ -325,13 +330,12 @@ class temp(threading.Thread):
                 self.log()
             else:
                 sleep(0.1)
+            if Debug:
+                print "Log Int"
             if (datetime.datetime.now()-self.log_time>=datetime.timedelta(minutes=self.log_int)):
                 self.log()
             else:
                 sleep(0.5)
-            #if self.loop:
-                #sleep(0.5)
-                #sleep(1)
         del self.relay
         self.cur.close()
         self.conn.close()
