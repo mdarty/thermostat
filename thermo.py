@@ -1,12 +1,13 @@
 #!/usr/bin/python2
 import RPi.GPIO as GPIO
 from time import sleep
-import datetime, sys, os, signal, threading, os.path, pywapi, dhtreader
+import datetime, sys, os, signal, threading, os.path, pywapi
+import Adafruit_DHT
 import ConfigParser
 import psycopg2
 import picamera, numpy
-import matplotlib as mpl
-mpl.use('Agg')
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import redis
 
@@ -113,49 +114,6 @@ class relay:
         GPIO.cleanup()
         print "GPIO clean"
 
-class DHT(threading.Thread):
-    def __init__(self):
-        threading.Thread.__init__(self)
-        dhtreader.init()
-        self.dev_type = int(22)
-        self.dhtpin = int(4)
-        self.loop = True
-        self.t = 0
-        self.h = 0
-        self.THI = 0
-
-    def read(self):
-        return self.t, self.h, self.THI
-
-    def run(self):
-        t = 0
-        h = 0
-        while(self.loop):
-            while(self.loop):
-                try:
-                    t, h = dhtreader.read(self.dev_type, self.dhtpin)
-                    break
-                except TypeError:
-                    self.wait(5)
-            self.t = round(t*9/5 + 32,1)
-            self.h = round(h, 1)
-            #self.THI = round(t-0.55*(1-h/100)*(t-58),1)
-            self.THI = self.t
-            self.wait(60)
-        print "Sensor died"
-
-    def wait(self, time):
-        for i in range(time):
-            sleep(1)
-            if self.loop == False:
-                break
-
-    def stop(self):
-        self.loop = False
-
-    def __del__(self):
-        self.loop = False
-
 class thermo:
     def __init__(self):
         self.active_hist = 1
@@ -180,8 +138,6 @@ class temp(threading.Thread):
         global Database
         threading.Thread.__init__(self)
         self.relay = relay()
-        self.sensor = DHT()
-        self.sensor.start()
         self.thermo = thermo()
         self.loop = True
         self.log_int = 15
@@ -198,6 +154,11 @@ class temp(threading.Thread):
         folder = "/tmp/thermo"
         if not os.path.exists(folder):
             os.makedirs(folder)
+        self.pipe.set('set_away_temp', self.thermo.set_away_temp)
+        self.pipe.set('set_temp', self.thermo.set_temp)
+        self.pipe.execute()
+        self.dev_type = Adafruit_DHT.DHT22
+        self.dhtpin = int(4)
 
     def run(self):
         global Debug
@@ -215,7 +176,7 @@ class temp(threading.Thread):
             self.thermo.mode, self.thermo.set_temp, self.thermo.state, self.thermo.set_away_temp, self.thermo.set_away, garage = self.pipe.execute()
 
             if Debug:
-                print "Garage"
+                print "Garage: "+garage
             if garage == "on":
                 if Debug:
                     print "Opening Garage"
@@ -233,7 +194,9 @@ class temp(threading.Thread):
             self.thermo.cpu_temp = self.cpu_temp
             if Debug:
                 print "Sensor Read"
-            self.thermo.T, self.thermo.RH, self.thermo.THI = self.sensor.read()
+            self.thermo.RH, self.thermo.T = Adafruit_DHT.read_retry(self.dev_type, self.dhtpin)
+            #self.THI = round(t-0.55*(1-h/100)*(t-58),1)
+            self.thermo.THI = self.thermo.T
             if datetime.datetime.now() - self.run_time >= datetime.timedelta(minutes = self.run_int):
                 self.thermo.Tout, self.thermo.RHout = outdoor()
             else:
@@ -333,20 +296,20 @@ class temp(threading.Thread):
         global Database
         if Debug:
             print "Log"
-        self.conn = psycopg2.connect("dbname = 'thermo' user = 'thermo' host = 'localhost' password = 'chaaCoh9' options = '-c statement_timeout = 1000'")
+        self.conn = psycopg2.connect("dbname = 'thermo' user = 'thermo' host = 'localhost' password = 'chaaCoh9' options = '-c statement_timeout=1000'")
         self.cur = self.conn.cursor()
         datetime.datetime.now()
         print "desired_temp" + str(self.desired_temp)
         self.desired_temp = int(0)
 
-        self.cur.execute("""INSERT INTO thermo_log (Time,T,RH,Tout,RHout,THI,hist,desired_temp,state,mode,relay) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);""",(datetime.datetime.now(), self.thermo.T, self.thermo.RH, self.thermo.Tout, self.thermo.RHout, self.thermo.THI, self.hist, self.desired_temp, self.thermo.state, self.thermo.mode, self.relay.run))
+        self.cur.execute("""INSERT INTO thermo_log (Time, T, RH, Tout, RHout, THI, hist, desired_temp, state, mode, relay) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);""",(datetime.datetime.now(), self.thermo.T, self.thermo.RH, self.thermo.Tout, self.thermo.RHout, self.thermo.THI, self.hist, self.desired_temp, self.thermo.state, self.thermo.mode, self.relay.run))
         self.conn.commit()
 
         self.log_time = datetime.datetime.now()
 
         entrys = 150
 
-        self.cur.execute("""SELECT Time,T,desired_temp,Tout FROM thermo_log WHERE Time >= NOW() - '1 day'::INTERVAL ORDER BY Time LIMIT %s;""", (entrys, ))
+        self.cur.execute("""SELECT Time, T, desired_temp, Tout FROM thermo_log WHERE Time >= NOW() - '1 day'::INTERVAL ORDER BY Time LIMIT %s;""", (entrys, ))
         data = self.cur.fetchall()
 
         entrys = len(data)
@@ -394,7 +357,7 @@ class temp(threading.Thread):
 
     def read_cpu_temp(self):
         temp_file = open('/sys/class/thermal/thermal_zone0/temp', 'r')
-        self.cpu_temp = int(temp_file.read())*9/5000 + 32
+        self.cpu_temp = int(temp_file.read()) * 9 / 5000 + 32
         temp_file.close()
         if self.cpu_temp > 185:
             print "I'm burning up"
