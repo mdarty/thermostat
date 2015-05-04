@@ -4,7 +4,6 @@ from time import sleep
 import datetime, sys, os, signal, threading, os.path, pywapi
 import Adafruit_DHT
 import ConfigParser
-import psycopg2
 import picamera, numpy
 import matplotlib
 matplotlib.use('Agg')
@@ -26,7 +25,6 @@ Garage_Pin = int(Config.get('thermo', 'Garage_Pin'))
 Stop = False
 
 Debug = False
-Database = False
 
 def sig_handler(signum, frame):
     global Stop
@@ -135,7 +133,6 @@ class thermo:
 class temp(threading.Thread):
     def __init__(self):
         global Debug
-        global Database
         threading.Thread.__init__(self)
         self.relay = relay()
         self.thermo = thermo()
@@ -147,7 +144,7 @@ class temp(threading.Thread):
         self.pic_int = 5
         self.pic_time = datetime.datetime.now() - datetime.timedelta(minutes = self.pic_int)
         self.hostname = ["192.168.1.27", "192.168.1.3"]
-        if Debug or Database:
+        if Debug:
             print "Connecting to Redis"
         self.red = redis.Redis(unix_socket_path = '/var/run/redis/redis.sock')
         self.pipe = self.red.pipeline(transaction = False)
@@ -159,10 +156,10 @@ class temp(threading.Thread):
         self.pipe.execute()
         self.dev_type = Adafruit_DHT.DHT22
         self.dhtpin = int(4)
+        self.log_list=[]
 
     def run(self):
         global Debug
-        global Database
         while(self.loop):
             if Debug:
                 print "Starting Loop"
@@ -195,7 +192,9 @@ class temp(threading.Thread):
             if Debug:
                 print "Sensor Read"
             self.thermo.RH, self.thermo.T = Adafruit_DHT.read_retry(self.dev_type, self.dhtpin)
-            #self.THI = round(t-0.55*(1-h/100)*(t-58),1)
+            self.thermo.RH=round(self.thermo.RH, 2)
+            self.thermo.T=round(self.thermo.T*9/5+32, 2)
+            #self.thermo.THI = round(t-0.55*(1-h/100)*(t-58),1)
             self.thermo.THI = self.thermo.T
             if datetime.datetime.now() - self.run_time >= datetime.timedelta(minutes = self.run_int):
                 self.thermo.Tout, self.thermo.RHout = outdoor()
@@ -282,8 +281,6 @@ class temp(threading.Thread):
             else:
                 sleep(0.5)
         del self.relay
-        self.sensor.stop()
-        self.sensor.join()
 
     def stop(self):
         self.loop = False
@@ -293,26 +290,26 @@ class temp(threading.Thread):
 
     def log(self):
         global Debug
-        global Database
         if Debug:
             print "Log"
-        self.conn = psycopg2.connect("dbname = 'thermo' user = 'thermo' host = 'localhost' password = 'chaaCoh9' options = '-c statement_timeout=1000'")
-        self.cur = self.conn.cursor()
-        datetime.datetime.now()
         print "desired_temp" + str(self.desired_temp)
         self.desired_temp = int(0)
-
-        self.cur.execute("""INSERT INTO thermo_log (Time, T, RH, Tout, RHout, THI, hist, desired_temp, state, mode, relay) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);""",(datetime.datetime.now(), self.thermo.T, self.thermo.RH, self.thermo.Tout, self.thermo.RHout, self.thermo.THI, self.hist, self.desired_temp, self.thermo.state, self.thermo.mode, self.relay.run))
-        self.conn.commit()
+        self.log_list.append([datetime.datetime.now(), self.thermo.T, self.thermo.RH, self.thermo.Tout, self.thermo.RHout, self.thermo.THI, self.hist, self.desired_temp, self.thermo.state, self.thermo.mode, self.relay.run])
+        with open("/tmp/thermo/thermo.log", "a") as myfile:
+            string=''
+            for i in self.log_list[-1]:
+                string+=str(i)+'\t'
+            string[:-1]
+            string+='\n'
+            myfile.write(string)
+        if len(self.log_list)>60*24/15:
+            print self.log_list.pop(0)
+        else:
+            print "{}/{}".format(len(self.log_list), 60*24/15)
 
         self.log_time = datetime.datetime.now()
 
-        entrys = 150
-
-        self.cur.execute("""SELECT Time, T, desired_temp, Tout FROM thermo_log WHERE Time >= NOW() - '1 day'::INTERVAL ORDER BY Time LIMIT %s;""", (entrys, ))
-        data = self.cur.fetchall()
-
-        entrys = len(data)
+        entrys = len(self.log_list)
 
         Time = numpy.empty(entrys)
         T = numpy.empty(entrys)
@@ -322,8 +319,8 @@ class temp(threading.Thread):
         if Debug:
             print "Generate Graph"
 
-        for i, row in enumerate(data):
-           Time[i] = (row[0]-data[0][0]).total_seconds()/3600
+        for i, row in enumerate(self.log_list):
+           Time[i] = (row[0]-self.log_list[0][0]).total_seconds()/3600
            T[i] = row[1]
            desired_temp[i] = row[2]
            Tout[i] = row[3]
@@ -335,9 +332,6 @@ class temp(threading.Thread):
         plt.ylabel('Temp (f)')
         plt.savefig('/tmp/thermo/graph.png')
         plt.close()
-
-        self.cur.close()
-        self.conn.close()
 
     def home(self):
         self.state = "away"
@@ -352,7 +346,6 @@ class temp(threading.Thread):
             sleep(1)
             if not self.loop:
                 del self.relay
-                del self.sensor
                 break
 
     def read_cpu_temp(self):
@@ -364,12 +357,9 @@ class temp(threading.Thread):
 
 def main():
     global Debug
-    global Database
     print "PID: " + str(os.getpid())
     if Debug:
         print "Debug"
-    if Database:
-        print "Database"
     t = temp()
     t.start()
     while True:
@@ -385,8 +375,7 @@ def main():
     sys.exit(0)
 
 if __name__ == "__main__":
-    if sys.argv[1] == 'Debug':
-        Debug = True
-    if sys.argv[1] == 'Database':
-        Database = True
+    if sys.argv:
+        if sys.argv[1] == 'Debug':
+            Debug = True
     main()

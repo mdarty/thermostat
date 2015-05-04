@@ -60,16 +60,6 @@ def login():
         form = form,
         providers = app.config['OPENID_PROVIDERS'])
 
-@app.route('/get_image')
-def get_image():
-    filename = '/tmp/thermo/image.jpg'
-    return send_file(filename, mimetype = 'image/jpg')
-
-@app.route('/get_graph')
-def get_graph():
-    filename = '/tmp/thermo/graph.png'
-    return send_file(filename, mimetype = 'image/png')
-
 @app.route('/run_AC', methods = ['Get'])
 def run_AC():
     return red.get('run')
