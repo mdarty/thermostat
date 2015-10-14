@@ -4,6 +4,7 @@ from flask.ext.wtf import Form
 from wtforms import TextField, BooleanField
 from wtforms.validators import Required
 import ConfigParser, redis
+from flask_bootstrap import Bootstrap
 
 red=redis.Redis(unix_socket_path='/var/run/redis/redis.sock')
 pipe=red.pipeline(transaction=False)
@@ -12,7 +13,9 @@ Config = ConfigParser.ConfigParser()
 Config.read('/root/thermostat/config.ini')
 
 app=Flask(__name__)
+Bootstrap(app)
 app.config.from_object('config')
+app.debug=True
 
 class LoginForm(Form):
     openid = TextField('openid', validators = [Required()])

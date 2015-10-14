@@ -130,6 +130,10 @@ class thermo:
 
 class temp(threading.Thread):
     def __init__(self):
+        pid=str(os.getpid())
+        print "PID: " + pid
+        with open("/var/run/thermo.pid", "w") as f:
+            f.write(pid)
         global Debug
         threading.Thread.__init__(self)
         self.relay = relay()
@@ -313,12 +317,12 @@ class temp(threading.Thread):
 
         print "desired_temp" + str(self.desired_temp)
         self.desired_temp = int(0)
-        if len(self.log_list) == 0 and os.path.isfile("/tmp/thermo/log.pickle"):
-            self.log_list=pickle.load(open("/tmp/thermo/log.pickle", "rb"))
+        if len(self.log_list) == 0 and os.path.isfile("/root/.thermo/log.pickle"):
+            self.log_list=pickle.load(open("/root/.thermo/log.pickle", "rb"))
 
         self.log_list.append([datetime.now(), self.thermo.T, self.thermo.RH, self.thermo.Tout, self.thermo.RHout, self.thermo.THI, self.hist, self.desired_temp, self.thermo.state, self.thermo.mode, self.relay.run])
 
-        with open("/tmp/thermo/thermo.log", "a") as myfile:
+        with open("/root/.thermo/thermo.log", "a") as myfile:
             string=''
             for i in self.log_list[-1]:
                 string+=str(i)+'\t'
@@ -386,13 +390,14 @@ class temp(threading.Thread):
         self.loop = False
 
     def __del__(self):
-        pickle.dump(self.log_list, open("/tmp/thermo/log.pickle", "wb"))
+        pickle.dump(self.log_list, open("/root/.thermo/log.pickle", "wb"))
         self.loop = False
 
 
 def main():
     global Debug
-    print "PID: " + str(os.getpid())
+    pid=str(os.getpid())
+    print "PID: " + pid
     if Debug:
         print "Debug"
     t = temp()
@@ -410,7 +415,7 @@ def main():
     sys.exit(0)
 
 if __name__ == "__main__":
-    if sys.argv:
+    if len(sys.argv)>1:
         if sys.argv[1] == 'Debug':
             Debug = True
     main()

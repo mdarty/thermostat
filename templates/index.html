@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% block head %}
+    {{ super() }}
     <script>
     function updatetemp() {
     	$SCRIPT_ROOT = {{ request.script_root|tojson|safe }};
@@ -79,7 +80,8 @@
     </script>
 {% endblock %}
 {% block content %}
-    <table>
+<div class="container">
+    <table class="table" style="width:50px">
         <tr>
             <th></th>
             <th>Temp</th>
@@ -145,11 +147,18 @@
             <input type="radio" name="set_away" value="off" checked>Off<br>
         {% endif %}
         <br>
-        <h3 class="inline">Here:</h3> <input type="text" name="set_temp" size=2 value="{{set_temp}}"/>
-        <h3 class="inline">Away:</h3> <input type="text" name="set_away_temp" size=2 value="{{set_away_temp}}"/>
-        <button type="submit" name="submit" value="temp">Go</button>
-        <button type="submit" name="submit" value="Garage">Garage</button>
+        <div class="input-group imput-group-lg" style="padding:10px">
+            <span class="input-group-addon">Here</span>
+            <input type="text" style='width:4em' class="form-control" name="set_temp" size=2 value="{{set_temp}}"/>
+        </div>
+        <div class="input-group imput-group-lg" style="padding:10px">
+            <span class="input-group-addon">Away</span>
+            <input type="text" style='width:4em' class="form-control" name="set_away_temp" value="{{set_away_temp}}">
+        </div>
+        <button type="submit" name="submit" class="btn btn-primary btn-lg" style="padding:10px" value="temp">Go</button>
+        <button type="submit" name="submit" class="btn btn-primary btn-lg" style="padding:10px" value="Garage">Garage</button>
     </form>
-    <img src="/static/image.jpg" height="600" width="800" alt="camera">
-    <img src="/static/graph.png" height="600" width="800" alt="graph">
+    <img class="img-responsive" style="padding-top:10px; padding-bottom:10px" src="/static/image.jpg" alt="camera">
+    <img class="img-responsive" style="padding-top:10px; padding-bottom:10px" src="/static/graph.png" alt="graph">
+    </div>
 {% endblock %}
