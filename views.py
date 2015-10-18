@@ -1,11 +1,8 @@
 #!/usr/bin/python2
 import redis
 import ConfigParser
-from flask.ext.wtf import Form
 from flask_bootstrap import Bootstrap
-from wtforms.validators import Required
-from wtforms import TextField, BooleanField
-from flask import Flask, render_template, flash, redirect, request, send_file
+from flask import Flask, render_template, request
 
 red = redis.Redis(unix_socket_path='/var/run/redis/redis.sock')
 pipe = red.pipeline(transaction=False)
@@ -17,11 +14,6 @@ app = Flask(__name__)
 Bootstrap(app)
 app.config.from_object('config')
 app.debug = True
-
-
-class LoginForm(Form):
-    openid = TextField('openid', validators=[Required()])
-    remember_me = BooleanField('remember_me', default=False)
 
 
 @app.route('/')
@@ -67,20 +59,6 @@ def index_post():
                            state=state,
                            set_away_temp=set_away_temp,
                            set_away=set_away)
-
-
-@app.route('/login', methods=['GET', 'POST'])
-def login():
-    form = LoginForm()
-    if form.validate_on_submit():
-        flash('Login requested for ' +
-              'OpenID="{}", remember_me={}'.format(form.openid.data,
-                                                   form.remember_me.data))
-        return redirect('/index')
-    return render_template('login.html',
-                           title='Sign In',
-                           form=form,
-                           providers=app.config['OPENID_PROVIDERS'])
 
 
 @app.route('/run_AC', methods=['Get'])
