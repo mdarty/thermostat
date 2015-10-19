@@ -1,4 +1,5 @@
-#!/usr/bin/python2
+#!/usr/bin/env python3
+from __future__ import print_function
 import os
 import sys
 import redis
@@ -9,16 +10,19 @@ import os.path
 import picamera
 import threading
 import Adafruit_DHT
-import ConfigParser
+import configparser
 from time import sleep
 import RPi.GPIO as GPIO
-import cPickle as pickle
 from datetime import datetime, timedelta
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
+if sys.version_info > (3, 0):
+    import pickle
+else:
+    import cPickle as pickle
 
-Config = ConfigParser.ConfigParser()
+Config = configparser.ConfigParser()
 Config.read('/root/thermostat/config.ini')
 ZIP = Config.get('thermo', 'ZIP')
 NOAA = Config.get('thermo', 'NOAA')
@@ -351,7 +355,10 @@ class temp(threading.Thread):
         self.desired_temp = int(0)
         if (len(self.log_list) == 0 and
                 os.path.isfile("/root/.thermo/log.pickle")):
-            self.log_list = pickle.load(open("/root/.thermo/log.pickle", "rb"))
+            try:
+                self.log_list = pickle.load(open("/root/.thermo/log.pickle", "rb"))
+            except ValueError or UnicodeDecodeError:
+                os.remove("/root/.thermo/log.pickle")
 
         self.log_list.append([datetime.now(),
                               self.thermo.T,

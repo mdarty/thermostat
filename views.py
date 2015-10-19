@@ -12,7 +12,7 @@ Config.read('/root/thermostat/config.ini')
 
 app = Flask(__name__)
 Bootstrap(app)
-app.config.from_object('config')
+# app.config.from_object('config')
 app.debug = True
 
 
