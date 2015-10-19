@@ -1,13 +1,14 @@
-#!/usr/bin/python2
+#!/usr/bin/env python3
+from __future__ import print_function
 import redis
-import ConfigParser
+import configparser
 from flask_bootstrap import Bootstrap
 from flask import Flask, render_template, request
 
 red = redis.Redis(unix_socket_path='/var/run/redis/redis.sock')
 pipe = red.pipeline(transaction=False)
 
-Config = ConfigParser.ConfigParser()
+Config = configparser.ConfigParser()
 Config.read('/root/thermostat/config.ini')
 
 app = Flask(__name__)
@@ -98,5 +99,5 @@ def stop():
     return 'stopped'
 
 if __name__ == "__main__":
-    # app.run("0.0.0.0", port=80)
+    # app.run("0.0.0.0", port=8080)
     app.run()
