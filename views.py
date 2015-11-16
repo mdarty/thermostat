@@ -28,11 +28,11 @@ def index():
     mode, set_temp, state, set_away_temp, set_away = pipe.execute()
     return render_template("index.html",
                            title="Thermostat",
-                           mode=mode,
-                           set_temp=set_temp,
-                           state=state,
-                           set_away_temp=set_away_temp,
-                           set_away=set_away)
+                           mode=mode.decode(encoding='UTF-8'),
+                           set_temp=set_temp.decode(encoding='UTF-8'),
+                           state=state.decode(encoding='UTF-8'),
+                           set_away_temp=set_away_temp.decode(encoding='UTF-8'),
+                           set_away=set_away.decode(encoding='UTF-8'))
 
 
 @app.route('/index', methods=['POST'])
